@@ -203,6 +203,18 @@
       "Resource": "*"
     },
     {
+      "Sid": "AWSBudgets",
+      "Effect": "Allow",
+      "Action": [
+        "budgets:CreateBudget",
+        "budgets:UpdateBudget",
+        "budgets:DeleteBudget",
+        "budgets:ViewBudget",
+        "budgets:ModifyBudget"
+      ],
+      "Resource": "*"
+    },
+    {
       "Sid": "EventBridge",
       "Effect": "Allow",
       "Action": [

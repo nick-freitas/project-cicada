@@ -3,6 +3,7 @@ import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 import * as cloudwatchActions from 'aws-cdk-lib/aws-cloudwatch-actions';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as snsSubscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
+import * as budgets from 'aws-cdk-lib/aws-budgets';
 import { Construct } from 'constructs';
 import { DataStack } from './data-stack';
 import { ComputeStack } from './compute-stack';
@@ -13,14 +14,20 @@ export interface MonitoringStackProps extends cdk.StackProps {
   computeStack: ComputeStack;
   apiStack: APIStack;
   alertEmail?: string;
+  monthlyBudgetLimit?: number; // Default: $100
+  dailyBudgetLimit?: number; // Default: $3.33 (~$100/30)
 }
 
 export class MonitoringStack extends cdk.Stack {
   public readonly costAlarmTopic: sns.Topic;
   public readonly dashboard: cloudwatch.Dashboard;
+  public readonly monthlyBudget: budgets.CfnBudget;
 
   constructor(scope: Construct, id: string, props: MonitoringStackProps) {
     super(scope, id, props);
+
+    const monthlyLimit = props.monthlyBudgetLimit || 100;
+    const dailyLimit = props.dailyBudgetLimit || 3.33;
 
     // Create SNS topic for cost alerts
     this.costAlarmTopic = new sns.Topic(this, 'CostAlarmTopic', {
@@ -35,27 +42,93 @@ export class MonitoringStack extends cdk.Stack {
       );
     }
 
-    // Create CloudWatch alarm for daily cost > $3
-    // Note: AWS Budgets is better for cost monitoring, but CloudWatch can track usage metrics
-    const dailyCostAlarm = new cloudwatch.Alarm(this, 'DailyCostAlarm', {
-      alarmName: 'CICADA-Daily-Cost-Exceeded',
-      alarmDescription: 'Alert when estimated daily cost exceeds $3',
-      metric: new cloudwatch.Metric({
-        namespace: 'AWS/Billing',
-        metricName: 'EstimatedCharges',
-        dimensionsMap: {
-          Currency: 'USD',
+    // Create AWS Budget for monthly cost tracking
+    this.monthlyBudget = new budgets.CfnBudget(this, 'MonthlyBudget', {
+      budget: {
+        budgetName: 'CICADA-Monthly-Budget',
+        budgetType: 'COST',
+        timeUnit: 'MONTHLY',
+        budgetLimit: {
+          amount: monthlyLimit,
+          unit: 'USD',
         },
-        statistic: 'Maximum',
-        period: cdk.Duration.hours(6),
-      }),
-      threshold: 3,
-      evaluationPeriods: 1,
-      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
-      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+        costFilters: {
+          // Optional: Filter by tags if you want to track only CICADA resources
+          // TagKeyValue: ['user:Project$CICADA'],
+        },
+        costTypes: {
+          includeCredit: false,
+          includeDiscount: true,
+          includeOtherSubscription: true,
+          includeRecurring: true,
+          includeRefund: false,
+          includeSubscription: true,
+          includeSupport: false,
+          includeTax: false,
+          includeUpfront: true,
+          useBlended: false,
+        },
+      },
+      notificationsWithSubscribers: [
+        {
+          notification: {
+            notificationType: 'ACTUAL',
+            comparisonOperator: 'GREATER_THAN',
+            threshold: 80, // Alert at 80% of budget
+            thresholdType: 'PERCENTAGE',
+          },
+          subscribers: props.alertEmail
+            ? [
+                {
+                  subscriptionType: 'EMAIL',
+                  address: props.alertEmail,
+                },
+              ]
+            : [],
+        },
+        {
+          notification: {
+            notificationType: 'ACTUAL',
+            comparisonOperator: 'GREATER_THAN',
+            threshold: 100, // Alert at 100% of budget
+            thresholdType: 'PERCENTAGE',
+          },
+          subscribers: props.alertEmail
+            ? [
+                {
+                  subscriptionType: 'EMAIL',
+                  address: props.alertEmail,
+                },
+                {
+                  subscriptionType: 'SNS',
+                  address: this.costAlarmTopic.topicArn,
+                },
+              ]
+            : [
+                {
+                  subscriptionType: 'SNS',
+                  address: this.costAlarmTopic.topicArn,
+                },
+              ],
+        },
+        {
+          notification: {
+            notificationType: 'FORECASTED',
+            comparisonOperator: 'GREATER_THAN',
+            threshold: 100, // Alert if forecasted to exceed budget
+            thresholdType: 'PERCENTAGE',
+          },
+          subscribers: props.alertEmail
+            ? [
+                {
+                  subscriptionType: 'EMAIL',
+                  address: props.alertEmail,
+                },
+              ]
+            : [],
+        },
+      ],
     });
-
-    dailyCostAlarm.addAlarmAction(new cloudwatchActions.SnsAction(this.costAlarmTopic));
 
     // Create CloudWatch Dashboard
     this.dashboard = new cloudwatch.Dashboard(this, 'CICADADashboard', {
@@ -198,6 +271,16 @@ export class MonitoringStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'DashboardURL', {
       value: `https://console.aws.amazon.com/cloudwatch/home?region=${this.region}#dashboards:name=${this.dashboard.dashboardName}`,
       description: 'CloudWatch Dashboard URL',
+    });
+
+    new cdk.CfnOutput(this, 'BudgetURL', {
+      value: `https://console.aws.amazon.com/billing/home#/budgets`,
+      description: 'AWS Budgets Console URL',
+    });
+
+    new cdk.CfnOutput(this, 'MonthlyBudgetLimit', {
+      value: monthlyLimit.toString(),
+      description: 'Monthly budget limit in USD',
     });
 
     new cdk.CfnOutput(this, 'CostAlarmTopicArn', {
