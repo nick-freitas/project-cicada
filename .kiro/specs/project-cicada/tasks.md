@@ -259,7 +259,7 @@ dsass
   - Test failure handling and retries
   - _Requirements: 24.3, 24.4, 24.5_
 
-- [ ] 16. Implement REST API for profile management
+- [x] 16. Implement REST API for profile management
   - Create API Gateway REST API
   - Implement profile list endpoints
   - Implement profile detail endpoints
@@ -267,7 +267,7 @@ dsass
   - Implement authentication middleware
   - _Requirements: 19.1, 19.2, 19.3, 19.4, 19.5, 19.6, 19.7_
 
-- [ ] 16.1 Write integration test for profile API
+- [x] 16.1 Write integration test for profile API
   - Test profile CRUD operations
   - Test authentication
   - Test user isolation
