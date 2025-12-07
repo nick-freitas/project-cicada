@@ -57,6 +57,12 @@ importers:
       aws-cdk:
         specifier: ^2.100.0
         version: 2.1033.0
+      dotenv:
+        specifier: ^17.2.3
+        version: 17.2.3
+      dotenv-cli:
+        specifier: ^11.0.0
+        version: 11.0.0
       jest:
         specifier: ^29.0.0
         version: 29.7.0(@types/node@20.19.25)(ts-node@10.9.2(@types/node@20.19.25)(typescript@5.9.3))

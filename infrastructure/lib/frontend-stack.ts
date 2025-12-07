@@ -37,14 +37,6 @@ export class FrontendStack extends cdk.Stack {
       encryption: s3.BucketEncryption.S3_MANAGED,
     });
 
-    // Create CloudFront Origin Access Identity
-    const originAccessIdentity = new cloudfront.OriginAccessIdentity(this, 'OAI', {
-      comment: 'OAI for CICADA frontend',
-    });
-
-    // Grant CloudFront access to S3 bucket
-    this.bucket.grantRead(originAccessIdentity);
-
     // Custom domain setup (optional)
     let certificate: acm.ICertificate | undefined;
     let domainNames: string[] | undefined;
@@ -68,9 +60,7 @@ export class FrontendStack extends cdk.Stack {
     // Create CloudFront distribution
     this.distribution = new cloudfront.Distribution(this, 'Distribution', {
       defaultBehavior: {
-        origin: new origins.S3Origin(this.bucket, {
-          originAccessIdentity,
-        }),
+        origin: origins.S3BucketOrigin.withOriginAccessControl(this.bucket),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
         cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
