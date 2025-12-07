@@ -35,6 +35,7 @@ const agentStack = new AgentStack(app, 'ProjectCICADAAgentStack', {
 // API layer - API Gateway
 const apiStack = new APIStack(app, 'ProjectCICADAAPIStack', {
   env,
+  dataStack,
   computeStack,
   agentStack,
 });

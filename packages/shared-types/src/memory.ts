@@ -24,10 +24,18 @@ export interface RequestTracking {
   userId: string;
   connectionId: string;
   status: 'processing' | 'complete' | 'error';
-  query: string;
+  message: string;
+  sessionId: string;
   responseChunks: string[];
-  fullResponse?: string;
-  createdAt: string;
-  completedAt?: string;
+  accumulatedResponse: string;
   error?: string;
+  createdAt: number;
+  updatedAt: number;
+  ttl: number; // 24 hours from creation
+}
+
+export interface ConnectionInfo {
+  connectionId: string;
+  userId: string;
+  connectedAt: number;
 }

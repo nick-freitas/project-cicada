@@ -1,17 +1,195 @@
 import * as cdk from 'aws-cdk-lib';
+import * as apigatewayv2 from 'aws-cdk-lib/aws-apigatewayv2';
+import * as apigatewayv2Integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as sqs from 'aws-cdk-lib/aws-sqs';
+import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 import { ComputeStack } from './compute-stack';
 import { AgentStack } from './agent-stack';
+import { DataStack } from './data-stack';
+import * as path from 'path';
 
 export interface APIStackProps extends cdk.StackProps {
   computeStack: ComputeStack;
   agentStack: AgentStack;
+  dataStack: DataStack;
 }
 
 export class APIStack extends cdk.Stack {
+  public readonly webSocketApi: apigatewayv2.WebSocketApi;
+  public readonly webSocketStage: apigatewayv2.WebSocketStage;
+  public readonly messageQueue: sqs.Queue;
+
   constructor(scope: Construct, id: string, props: APIStackProps) {
     super(scope, id, props);
 
-    // API Gateway will be added in future tasks
+    // Create DynamoDB table for WebSocket connections
+    const connectionsTable = new dynamodb.Table(this, 'WebSocketConnections', {
+      partitionKey: { name: 'connectionId', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      timeToLiveAttribute: 'ttl',
+    });
+
+    // Create SQS queue for message processing
+    this.messageQueue = new sqs.Queue(this, 'MessageQueue', {
+      visibilityTimeout: cdk.Duration.seconds(300), // 5 minutes for agent processing
+      retentionPeriod: cdk.Duration.days(1),
+    });
+
+    // Create WebSocket handler Lambda
+    const webSocketHandler = new lambdaNodejs.NodejsFunction(this, 'WebSocketHandler', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'handler',
+      entry: path.join(__dirname, '../../packages/backend/src/handlers/websocket/handler.ts'),
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 512,
+      environment: {
+        REQUEST_TRACKING_TABLE: props.dataStack.requestTrackingTable.tableName,
+        CONNECTIONS_TABLE: connectionsTable.tableName,
+        MESSAGE_QUEUE_URL: this.messageQueue.queueUrl,
+      },
+      bundling: {
+        externalModules: ['@aws-sdk/*'],
+        minify: true,
+      },
+    });
+
+    // Grant permissions to WebSocket handler
+    props.dataStack.requestTrackingTable.grantReadWriteData(webSocketHandler);
+    connectionsTable.grantReadWriteData(webSocketHandler);
+    this.messageQueue.grantSendMessages(webSocketHandler);
+
+    // Create WebSocket API
+    this.webSocketApi = new apigatewayv2.WebSocketApi(this, 'WebSocketAPI', {
+      apiName: 'CICADA-WebSocket',
+      description: 'WebSocket API for CICADA agent streaming',
+      connectRouteOptions: {
+        integration: new apigatewayv2Integrations.WebSocketLambdaIntegration(
+          'ConnectIntegration',
+          webSocketHandler
+        ),
+      },
+      disconnectRouteOptions: {
+        integration: new apigatewayv2Integrations.WebSocketLambdaIntegration(
+          'DisconnectIntegration',
+          webSocketHandler
+        ),
+      },
+      defaultRouteOptions: {
+        integration: new apigatewayv2Integrations.WebSocketLambdaIntegration(
+          'DefaultIntegration',
+          webSocketHandler
+        ),
+      },
+    });
+
+    // Add custom routes
+    this.webSocketApi.addRoute('sendMessage', {
+      integration: new apigatewayv2Integrations.WebSocketLambdaIntegration(
+        'SendMessageIntegration',
+        webSocketHandler
+      ),
+    });
+
+    this.webSocketApi.addRoute('resume', {
+      integration: new apigatewayv2Integrations.WebSocketLambdaIntegration(
+        'ResumeIntegration',
+        webSocketHandler
+      ),
+    });
+
+    // Create WebSocket stage
+    this.webSocketStage = new apigatewayv2.WebSocketStage(this, 'WebSocketStage', {
+      webSocketApi: this.webSocketApi,
+      stageName: 'prod',
+      autoDeploy: true,
+    });
+
+    // Grant WebSocket handler permission to post to connections
+    webSocketHandler.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['execute-api:ManageConnections'],
+        resources: [
+          `arn:aws:execute-api:${this.region}:${this.account}:${this.webSocketApi.apiId}/${this.webSocketStage.stageName}/POST/@connections/*`,
+        ],
+      })
+    );
+
+    // Create message processor Lambda
+    const messageProcessor = new lambdaNodejs.NodejsFunction(this, 'MessageProcessor', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'handler',
+      entry: path.join(__dirname, '../../packages/backend/src/handlers/websocket/message-processor.ts'),
+      timeout: cdk.Duration.seconds(300), // 5 minutes for agent processing
+      memorySize: 1024,
+      environment: {
+        REQUEST_TRACKING_TABLE: props.dataStack.requestTrackingTable.tableName,
+        USER_PROFILES_TABLE: props.dataStack.userProfilesTable.tableName,
+        CONVERSATION_MEMORY_TABLE: props.dataStack.conversationMemoryTable.tableName,
+        FRAGMENT_GROUPS_TABLE: props.dataStack.fragmentGroupsTable.tableName,
+        EPISODE_CONFIG_TABLE: props.dataStack.episodeConfigTable.tableName,
+        KNOWLEDGE_BASE_BUCKET: props.dataStack.knowledgeBaseBucket.bucketName,
+        WEBSOCKET_DOMAIN_NAME: `${this.webSocketApi.apiId}.execute-api.${this.region}.amazonaws.com`,
+        WEBSOCKET_STAGE: this.webSocketStage.stageName,
+      },
+      bundling: {
+        externalModules: ['@aws-sdk/*'],
+        minify: true,
+      },
+    });
+
+    // Grant permissions to message processor
+    props.dataStack.requestTrackingTable.grantReadWriteData(messageProcessor);
+    props.dataStack.userProfilesTable.grantReadWriteData(messageProcessor);
+    props.dataStack.conversationMemoryTable.grantReadWriteData(messageProcessor);
+    props.dataStack.fragmentGroupsTable.grantReadWriteData(messageProcessor);
+    props.dataStack.episodeConfigTable.grantReadData(messageProcessor);
+    props.dataStack.knowledgeBaseBucket.grantRead(messageProcessor);
+    connectionsTable.grantReadWriteData(messageProcessor);
+
+    // Grant Bedrock permissions
+    messageProcessor.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'],
+        resources: ['*'],
+      })
+    );
+
+    // Grant permission to post to WebSocket connections
+    messageProcessor.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['execute-api:ManageConnections'],
+        resources: [
+          `arn:aws:execute-api:${this.region}:${this.account}:${this.webSocketApi.apiId}/${this.webSocketStage.stageName}/POST/@connections/*`,
+        ],
+      })
+    );
+
+    // Add SQS trigger to message processor
+    messageProcessor.addEventSource(
+      new lambdaEventSources.SqsEventSource(this.messageQueue, {
+        batchSize: 1, // Process one message at a time for streaming
+      })
+    );
+
+    // Outputs
+    new cdk.CfnOutput(this, 'WebSocketURL', {
+      value: this.webSocketStage.url,
+      description: 'WebSocket API URL',
+      exportName: 'CICADAWebSocketURL',
+    });
+
+    new cdk.CfnOutput(this, 'WebSocketAPIId', {
+      value: this.webSocketApi.apiId,
+      description: 'WebSocket API ID',
+    });
   }
 }
