@@ -24,6 +24,13 @@ coverage/
 # Environment variables
 .env
 .env.local
+.env.nonprod
+.env.prod
+packages/frontend/.env.nonprod
+packages/frontend/.env.production
+# Keep example and development files
+!.env.example
+!packages/frontend/.env.development
 
 # IDE
 .vscode/

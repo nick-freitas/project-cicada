@@ -3,9 +3,14 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --mode development",
+    "dev:nonprod": "vite --mode nonprod",
     "build": "tsc && vite build",
+    "build:nonprod": "tsc && vite build --mode nonprod",
+    "build:prod": "tsc && vite build --mode production",
     "preview": "vite preview",
+    "preview:nonprod": "vite preview --mode nonprod",
+    "preview:prod": "vite preview --mode production",
     "test": "echo 'No unit tests configured for frontend. E2E tests would use Playwright.'",
     "test:e2e": "echo 'E2E tests not yet configured'",
     "lint": "eslint . --ext ts,tsx"
