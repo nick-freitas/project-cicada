@@ -2,11 +2,17 @@ import * as cdk from 'aws-cdk-lib';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 import { Construct } from 'constructs';
 
+export interface AuthStackProps extends cdk.StackProps {
+  adminEmail?: string;
+  nickEmail?: string;
+  naizakEmail?: string;
+}
+
 export class AuthStack extends cdk.Stack {
   public readonly userPool: cognito.UserPool;
   public readonly userPoolClient: cognito.UserPoolClient;
 
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props?: AuthStackProps) {
     super(scope, id, props);
 
     // Create Cognito User Pool
@@ -45,51 +51,57 @@ export class AuthStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.RETAIN, // Keep user data on stack deletion
     });
 
-    // Create initial users (admin, Nick, Naizak)
-    new cognito.CfnUserPoolUser(this, 'AdminUser', {
-      userPoolId: this.userPool.userPoolId,
-      username: 'admin',
-      userAttributes: [
-        {
-          name: 'email',
-          value: 'admin@project-cicada.com',
-        },
-        {
-          name: 'email_verified',
-          value: 'true',
-        },
-      ],
-    });
+    // Create initial users (admin, Nick, Naizak) if emails are provided
+    if (props?.adminEmail) {
+      new cognito.CfnUserPoolUser(this, 'AdminUser', {
+        userPoolId: this.userPool.userPoolId,
+        username: 'admin',
+        userAttributes: [
+          {
+            name: 'email',
+            value: props.adminEmail,
+          },
+          {
+            name: 'email_verified',
+            value: 'true',
+          },
+        ],
+      });
+    }
 
-    new cognito.CfnUserPoolUser(this, 'NickUser', {
-      userPoolId: this.userPool.userPoolId,
-      username: 'nick',
-      userAttributes: [
-        {
-          name: 'email',
-          value: 'nick@project-cicada.com',
-        },
-        {
-          name: 'email_verified',
-          value: 'true',
-        },
-      ],
-    });
+    if (props?.nickEmail) {
+      new cognito.CfnUserPoolUser(this, 'NickUser', {
+        userPoolId: this.userPool.userPoolId,
+        username: 'nick',
+        userAttributes: [
+          {
+            name: 'email',
+            value: props.nickEmail,
+          },
+          {
+            name: 'email_verified',
+            value: 'true',
+          },
+        ],
+      });
+    }
 
-    new cognito.CfnUserPoolUser(this, 'NaizakUser', {
-      userPoolId: this.userPool.userPoolId,
-      username: 'naizak',
-      userAttributes: [
-        {
-          name: 'email',
-          value: 'naizak@project-cicada.com',
-        },
-        {
-          name: 'email_verified',
-          value: 'true',
-        },
-      ],
-    });
+    if (props?.naizakEmail) {
+      new cognito.CfnUserPoolUser(this, 'NaizakUser', {
+        userPoolId: this.userPool.userPoolId,
+        username: 'naizak',
+        userAttributes: [
+          {
+            name: 'email',
+            value: props.naizakEmail,
+          },
+          {
+            name: 'email_verified',
+            value: 'true',
+          },
+        ],
+      });
+    }
 
     // Create User Pool Client for frontend
     this.userPoolClient = new cognito.UserPoolClient(this, 'CICADAUserPoolClient', {

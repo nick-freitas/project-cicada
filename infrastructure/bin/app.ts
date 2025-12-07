@@ -18,7 +18,12 @@ const env = {
 const dataStack = new DataStack(app, 'ProjectCICADADataStack', { env });
 
 // Auth layer - Cognito
-const authStack = new AuthStack(app, 'ProjectCICADAAuthStack', { env });
+const authStack = new AuthStack(app, 'ProjectCICADAAuthStack', {
+  env,
+  adminEmail: process.env.ADMIN_EMAIL,
+  nickEmail: process.env.NICK_EMAIL,
+  naizakEmail: process.env.NAIZAK_EMAIL,
+});
 
 // API layer - API Gateway + Lambda functions
 const apiStack = new APIStack(app, 'ProjectCICADAAPIStack', {
