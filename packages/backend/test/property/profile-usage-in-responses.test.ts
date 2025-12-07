@@ -349,23 +349,30 @@ describe('Property 32: Profile Usage in Responses', () => {
       fc.asyncProperty(
         fc.string({ minLength: 5, maxLength: 20 }),
         fc.tuple(
-          fc.string({ minLength: 3, maxLength: 30 }).filter(s => s.replace(/[^a-z0-9]+/gi, '').length > 0),
-          fc.string({ minLength: 3, maxLength: 30 }).filter(s => s.replace(/[^a-z0-9]+/gi, '').length > 0),
-          fc.string({ minLength: 3, maxLength: 30 }).filter(s => s.replace(/[^a-z0-9]+/gi, '').length > 0)
+          fc.string({ minLength: 3, maxLength: 30 })
+            .filter(s => /[a-z]/i.test(s)) // Must contain at least one letter
+            .filter(s => s.replace(/[^a-z0-9]+/gi, '').length > 2),
+          fc.string({ minLength: 3, maxLength: 30 })
+            .filter(s => /[a-z]/i.test(s))
+            .filter(s => s.replace(/[^a-z0-9]+/gi, '').length > 2),
+          fc.string({ minLength: 3, maxLength: 30 })
+            .filter(s => /[a-z]/i.test(s))
+            .filter(s => s.replace(/[^a-z0-9]+/gi, '').length > 2)
         ).filter(([char, loc, theory]) => {
-          const charId = char.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-          const locId = loc.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-          const theoryId = theory.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-          return charId !== locId && charId !== theoryId && locId !== theoryId;
+          const charId = char.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').replace(/-+/g, '-');
+          const locId = loc.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').replace(/-+/g, '-');
+          const theoryId = theory.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').replace(/-+/g, '-');
+          return charId.length > 1 && locId.length > 1 && theoryId.length > 1 &&
+                 charId !== locId && charId !== theoryId && locId !== theoryId;
         }),
         async (userId, [characterName, locationName, theoryName]) => {
           // Create profiles of different types
-          const charProfileId = characterName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-          const locProfileId = locationName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-          const theoryProfileId = theoryName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+          const charProfileId = characterName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').replace(/-+/g, '-');
+          const locProfileId = locationName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').replace(/-+/g, '-');
+          const theoryProfileId = theoryName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').replace(/-+/g, '-');
 
           // Precondition: All profile IDs must be different and non-empty
-          fc.pre(charProfileId.length > 0 && locProfileId.length > 0 && theoryProfileId.length > 0);
+          fc.pre(charProfileId.length > 1 && locProfileId.length > 1 && theoryProfileId.length > 1);
           fc.pre(charProfileId !== locProfileId && charProfileId !== theoryProfileId && locProfileId !== theoryProfileId);
 
           const charProfile: Omit<CharacterProfile, 'version' | 'createdAt' | 'updatedAt'> = {

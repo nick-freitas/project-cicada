@@ -109,19 +109,44 @@ describe('Property 4: Episode Resolution Correctness', () => {
   it('should resolve the correct episode when multiple configurations exist', async () => {
     await fc.assert(
       fc.asyncProperty(
-        // Generate multiple episode configurations with distinct patterns
+        // Generate multiple episode configurations with distinct, non-overlapping patterns
         fc.array(
           fc.record({
             episodeId: fc.string({ minLength: 1, maxLength: 20 }).filter(s => s.trim().length > 0),
             episodeName: fc.string({ minLength: 1, maxLength: 50 }).filter(s => s.trim().length > 0),
-            filePattern: fc.string({ minLength: 1, maxLength: 15 }).map(s => `${s.replace(/[^a-z0-9_]/gi, '')}_*`),
+            filePattern: fc.string({ minLength: 2, maxLength: 15 })
+              .filter(s => s.replace(/[^a-z0-9_]/gi, '').length >= 2)
+              .map(s => `${s.replace(/[^a-z0-9_]/gi, '')}_*`),
             arcType: fc.constantFrom('question' as const, 'answer' as const, 'other' as const),
           }),
           { minLength: 2, maxLength: 5 }
         ).filter(configs => {
-          // Ensure all file patterns are unique
+          // Ensure all file patterns are unique and non-overlapping
           const patterns = configs.map(c => c.filePattern);
-          return new Set(patterns).size === patterns.length;
+          if (new Set(patterns).size !== patterns.length) return false;
+          
+          // Check for overlapping patterns (e.g., "_*" would match everything)
+          for (let i = 0; i < patterns.length; i++) {
+            for (let j = 0; j < patterns.length; j++) {
+              if (i !== j) {
+                const pattern1 = patterns[i].replace(/\*/g, '.*');
+                const pattern2 = patterns[j].replace(/\*/g, '.*');
+                const regex1 = new RegExp(`^${pattern1}$`, 'i');
+                const regex2 = new RegExp(`^${pattern2}$`, 'i');
+                
+                // Test if pattern1 would match pattern2's prefix
+                const prefix1 = patterns[i].replace('_*', '');
+                const prefix2 = patterns[j].replace('_*', '');
+                
+                if (prefix1.length > 0 && prefix2.length > 0) {
+                  if (regex1.test(prefix2 + '_test') || regex2.test(prefix1 + '_test')) {
+                    return false;
+                  }
+                }
+              }
+            }
+          }
+          return true;
         }),
         fc.integer({ min: 0, max: 4 }),
         async (configs, targetIndex) => {
