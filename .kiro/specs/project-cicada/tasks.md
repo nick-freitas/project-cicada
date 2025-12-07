@@ -1,4 +1,4 @@
-# Implementation Plan
+ds# Implementation Plan
 
 - [x] 1. Set up project structure and core infrastructure
   - Create monorepo structure with frontend and backend packages
@@ -81,7 +81,7 @@
   - **Property 9: Episode Grouping in Results**
   - **Validates: Requirements 3.5**
 
-- [ ] 6. Implement DynamoDB tables and Profile Service
+- [x] 6. Implement DynamoDB tables and Profile Service
   - Create UserProfiles table with GSI
   - Create ConversationMemory table
   - Create FragmentGroups table
@@ -90,15 +90,15 @@
   - Implement profile versioning for migrations
   - _Requirements: 14.1-14.5, 15.1-15.5, 16.1-16.5, 17.1-17.5, 18.1-18.5, 19.1-19.7_
 
-- [ ] 6.1 Write property test for user-scoped data isolation
+- [x] 6.1 Write property test for user-scoped data isolation
   - **Property 25: User-Scoped Data Isolation**
   - **Validates: Requirements 13.4, 14.3, 14.5**
 
-- [ ] 6.2 Write property test for profile auto-creation
+- [x] 6.2 Write property test for profile auto-creation
   - **Property 29: Profile Auto-Creation**
   - **Validates: Requirements 14.2, 15.2, 16.2, 17.2, 18.2**
 
-- [ ] 6.3 Write property test for profile updates
+- [x] 6.3 Write property test for profile updates
   - **Property 31: Profile Information Updates**
   - **Validates: Requirements 14.4, 15.4, 16.4, 17.4, 18.4**
 
