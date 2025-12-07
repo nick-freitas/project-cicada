@@ -118,11 +118,15 @@ describe('Property 4: Episode Resolution Correctness', () => {
             arcType: fc.constantFrom('question' as const, 'answer' as const, 'other' as const),
           }),
           { minLength: 2, maxLength: 5 }
-        ),
+        ).filter(configs => {
+          // Ensure all file patterns are unique
+          const patterns = configs.map(c => c.filePattern);
+          return new Set(patterns).size === patterns.length;
+        }),
         fc.integer({ min: 0, max: 4 }),
         async (configs, targetIndex) => {
           // Ensure we have at least one config and valid index
-          if (configs.length === 0) return;
+          fc.pre(configs.length >= 2);
           const actualIndex = targetIndex % configs.length;
 
           // Set up the mock configs

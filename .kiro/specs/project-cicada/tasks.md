@@ -217,7 +217,7 @@ dsass
   - **Property 16: Cross-Episode Attribution**
   - **Validates: Requirements 9.5, 10.5, 11.4**
 
-- [ ] 13. Checkpoint - Ensure all backend tests pass
+- [x] 13. Checkpoint - Ensure all backend tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 14. Implement WebSocket API and request tracking

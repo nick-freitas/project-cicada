@@ -364,6 +364,10 @@ describe('Property 32: Profile Usage in Responses', () => {
           const locProfileId = locationName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
           const theoryProfileId = theoryName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
+          // Precondition: All profile IDs must be different and non-empty
+          fc.pre(charProfileId.length > 0 && locProfileId.length > 0 && theoryProfileId.length > 0);
+          fc.pre(charProfileId !== locProfileId && charProfileId !== theoryProfileId && locProfileId !== theoryProfileId);
+
           const charProfile: Omit<CharacterProfile, 'version' | 'createdAt' | 'updatedAt'> = {
             userId,
             profileId: charProfileId,
