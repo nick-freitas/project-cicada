@@ -9,6 +9,14 @@ export interface Citation {
   nuance?: string;
 }
 
+export enum ProfileType {
+  CHARACTER = 'CHARACTER',
+  LOCATION = 'LOCATION',
+  EPISODE = 'EPISODE',
+  FRAGMENT_GROUP = 'FRAGMENT_GROUP',
+  THEORY = 'THEORY',
+}
+
 export interface BaseProfile {
   profileId: string;
   profileType: 'CHARACTER' | 'LOCATION' | 'EPISODE' | 'FRAGMENT_GROUP' | 'THEORY';

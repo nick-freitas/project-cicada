@@ -220,7 +220,7 @@ dsass
 - [x] 13. Checkpoint - Ensure all backend tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 14. Implement WebSocket API and request tracking
+- [x] 14. Implement WebSocket API and request tracking
   - Create API Gateway WebSocket API
   - Implement WebSocket Handler Lambda
   - Implement connection management (connect, disconnect)
@@ -230,19 +230,19 @@ dsass
   - Implement streaming to client
   - _Requirements: 22.2, 22.3, 22.4, 23.1, 23.2, 23.3, 23.4, 23.5_
 
-- [ ] 14.1 Write property test for request tracking creation
+- [x] 14.1 Write property test for request tracking creation
   - **Property 33: Request Tracking Creation**
   - **Validates: Requirements 23.1**
 
-- [ ] 14.2 Write property test for request status tracking
+- [x] 14.2 Write property test for request status tracking
   - **Property 34: Request Status Tracking**
   - **Validates: Requirements 23.2**
 
-- [ ] 14.3 Write property test for reconnection resume
+- [x] 14.3 Write property test for reconnection resume
   - **Property 35: Reconnection Resume**
   - **Validates: Requirements 23.4**
 
-- [ ] 14.4 Write property test for request completion
+- [x] 14.4 Write property test for request completion
   - **Property 36: Request Completion**
   - **Validates: Requirements 23.5**
 

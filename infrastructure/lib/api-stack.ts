@@ -180,6 +180,53 @@ export class APIStack extends cdk.Stack {
       })
     );
 
+    // Create REST API for profile management
+    const restApi = new cdk.aws_apigateway.RestApi(this, 'ProfileAPI', {
+      restApiName: 'CICADA-Profile-API',
+      description: 'REST API for CICADA profile management',
+      defaultCorsPreflightOptions: {
+        allowOrigins: cdk.aws_apigateway.Cors.ALL_ORIGINS,
+        allowMethods: cdk.aws_apigateway.Cors.ALL_METHODS,
+        allowHeaders: ['Content-Type', 'Authorization'],
+      },
+    });
+
+    // Create profile handler Lambda
+    const profileHandler = new lambdaNodejs.NodejsFunction(this, 'ProfileHandler', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'handler',
+      entry: path.join(__dirname, '../../packages/backend/src/handlers/rest-api/profile-handler.ts'),
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 512,
+      environment: {
+        USER_PROFILES_TABLE: props.dataStack.userProfilesTable.tableName,
+      },
+      bundling: {
+        externalModules: ['@aws-sdk/*'],
+        minify: true,
+      },
+    });
+
+    // Grant permissions to profile handler
+    props.dataStack.userProfilesTable.grantReadWriteData(profileHandler);
+
+    // Create API Gateway integration
+    const profileIntegration = new cdk.aws_apigateway.LambdaIntegration(profileHandler);
+
+    // Add routes
+    const profiles = restApi.root.addResource('profiles');
+    profiles.addMethod('GET', profileIntegration); // List all profiles
+    profiles.addMethod('POST', profileIntegration); // Create profile (with type in body)
+
+    const profileType = profiles.addResource('{profileType}');
+    profileType.addMethod('GET', profileIntegration); // List profiles by type
+    profileType.addMethod('POST', profileIntegration); // Create profile of type
+
+    const profileId = profileType.addResource('{profileId}');
+    profileId.addMethod('GET', profileIntegration); // Get specific profile
+    profileId.addMethod('PUT', profileIntegration); // Update profile
+    profileId.addMethod('DELETE', profileIntegration); // Delete profile
+
     // Outputs
     new cdk.CfnOutput(this, 'WebSocketURL', {
       value: this.webSocketStage.url,
@@ -190,6 +237,12 @@ export class APIStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'WebSocketAPIId', {
       value: this.webSocketApi.apiId,
       description: 'WebSocket API ID',
+    });
+
+    new cdk.CfnOutput(this, 'RestAPIURL', {
+      value: restApi.url,
+      description: 'REST API URL',
+      exportName: 'CICADARestAPIURL',
     });
   }
 }
