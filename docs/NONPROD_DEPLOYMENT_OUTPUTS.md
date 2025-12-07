@@ -27,16 +27,16 @@ All 5 stacks deployed successfully:
 - **UserProfiles**: ProjectCICADADataStack-UserProfiles32DFB678-O2MGGLMVP0S2
 
 ### AuthStack
-- **UserPoolId**: us-east-1_k2Y1R34Fa
-- **UserPoolClientId**: 4b144riee28sscjdbt0k6ljbb2
-- **UserPoolArn**: arn:aws:cognito-idp:us-east-1:461449807480:userpool/us-east-1_k2Y1R34Fa
+- **UserPoolId**: us-east-1_5aZxy0xjl
+- **UserPoolClientId**: 2j1o52p6vhqp3dguptgpmfvp91
+- **UserPoolArn**: arn:aws:cognito-idp:us-east-1:461449807480:userpool/us-east-1_5aZxy0xjl
 
 ### APIStack
-- **WebSocketURL**: wss://bjyhdwu52a.execute-api.us-east-1.amazonaws.com/prod
-- **RestAPIURL**: https://7ce3ti8pwe.execute-api.us-east-1.amazonaws.com/prod/
-- **WebSocketAPIId**: bjyhdwu52a
+- **WebSocketURL**: wss://0qqxq435yj.execute-api.us-east-1.amazonaws.com/prod
+- **RestAPIURL**: https://bwanrcvaal.execute-api.us-east-1.amazonaws.com/prod/
+- **WebSocketAPIId**: 0qqxq435yj
 - **StateMachineArn**: arn:aws:states:us-east-1:461449807480:stateMachine:CICADA-Agent-Orchestration
-- **MessageQueueName**: ProjectCICADAAPIStack-MessageQueue7A3BF959-sOE3fXYmPTdC
+- **MessageQueueName**: ProjectCICADAAPIStack-MessageQueue7A3BF959-oC4bvkRv2a6j
 
 ### FrontendStack (with Custom Domain)
 - **FrontendURL**: https://dev-app.project-cicada.com ⭐ (Custom Domain)
@@ -64,54 +64,43 @@ All 5 stacks deployed successfully:
 
 ### 1. Update Frontend Environment Variables
 
-Edit `packages/frontend/.env.nonprod`:
+✅ **Already configured** in `packages/frontend/.env.nonprod`:
 
 ```bash
-VITE_WEBSOCKET_URL=wss://bjyhdwu52a.execute-api.us-east-1.amazonaws.com/prod
-VITE_API_URL=https://7ce3ti8pwe.execute-api.us-east-1.amazonaws.com/prod/
-VITE_USER_POOL_ID=us-east-1_k2Y1R34Fa
-VITE_USER_POOL_CLIENT_ID=4b144riee28sscjdbt0k6ljbb2
+VITE_WEBSOCKET_URL=wss://0qqxq435yj.execute-api.us-east-1.amazonaws.com/prod
+VITE_API_URL=https://bwanrcvaal.execute-api.us-east-1.amazonaws.com/prod/
+VITE_USER_POOL_ID=us-east-1_5aZxy0xjl
+VITE_USER_POOL_CLIENT_ID=2j1o52p6vhqp3dguptgpmfvp91
 ```
 
 ### 2. Create Cognito Users
 
-The User Pool is created but has no users yet. Create them:
+✅ **Users already created** with emails from environment variables. To set passwords:
 
 ```bash
-# Admin user
-aws cognito-idp admin-create-user \
-  --user-pool-id us-east-1_k2Y1R34Fa \
-  --username admin \
-  --user-attributes Name=email,Value=admin@project-cicada.com \
-  --temporary-password "TempPass123!" \
-  --message-action SUPPRESS
-
-# Nick
-aws cognito-idp admin-create-user \
-  --user-pool-id us-east-1_k2Y1R34Fa \
-  --username nick \
-  --user-attributes Name=email,Value=nick@project-cicada.com \
-  --temporary-password "TempPass123!" \
-  --message-action SUPPRESS
-
-# Naizak
-aws cognito-idp admin-create-user \
-  --user-pool-id us-east-1_k2Y1R34Fa \
-  --username naizak \
-  --user-attributes Name=email,Value=naizak@project-cicada.com \
-  --temporary-password "TempPass123!" \
-  --message-action SUPPRESS
-```
-
-Then set permanent passwords:
-
-```bash
+# Set password for admin
 aws cognito-idp admin-set-user-password \
-  --user-pool-id us-east-1_k2Y1R34Fa \
+  --user-pool-id us-east-1_5aZxy0xjl \
   --username admin \
   --password "YourSecurePassword123!" \
   --permanent
+
+# Set password for nick
+aws cognito-idp admin-set-user-password \
+  --user-pool-id us-east-1_5aZxy0xjl \
+  --username nick \
+  --password "YourSecurePassword123!" \
+  --permanent
+
+# Set password for naizak
+aws cognito-idp admin-set-user-password \
+  --user-pool-id us-east-1_5aZxy0xjl \
+  --username naizak \
+  --password "YourSecurePassword123!" \
+  --permanent
 ```
+
+Or use the **Forgot Password** feature on the login page to reset via email.
 
 ### 3. Upload Script Data
 
