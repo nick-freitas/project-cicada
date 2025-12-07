@@ -61,7 +61,7 @@
   - Test semantic search functionality
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 5. Implement Knowledge Base Service
+- [x] 5. Implement Knowledge Base Service
   - Create Lambda function for semantic search
   - Implement query embedding generation
   - Implement episode filtering logic
@@ -69,15 +69,15 @@
   - Return structured results with complete metadata
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 5.1 Write property test for episode boundary enforcement
+- [x] 5.1 Write property test for episode boundary enforcement
   - **Property 7: Episode Boundary Enforcement**
   - **Validates: Requirements 3.2, 11.1, 11.3**
 
-- [ ] 5.2 Write property test for citation completeness
+- [x] 5.2 Write property test for citation completeness
   - **Property 8: Citation Completeness**
   - **Validates: Requirements 3.4, 5.1, 5.2, 5.3**
 
-- [ ] 5.3 Write property test for episode grouping
+- [x] 5.3 Write property test for episode grouping
   - **Property 9: Episode Grouping in Results**
   - **Validates: Requirements 3.5**
 
