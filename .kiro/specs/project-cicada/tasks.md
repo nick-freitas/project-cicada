@@ -193,7 +193,7 @@ dsass
   - Test Orchestrator → Profile Agent flow
   - _Requirements: 4.1, 4.2, 4.4_
 
-- [ ] 12. Implement fragment group management
+- [x] 12. Implement fragment group management
   - Implement fragment group creation logic
   - Implement fragment group storage
   - Implement fragment group retrieval
@@ -201,19 +201,19 @@ dsass
   - Implement episode inclusion for fragment groups
   - _Requirements: 9.2, 9.3, 9.4, 9.5, 10.1, 10.2, 10.3, 10.4, 10.5_
 
-- [ ] 12.1 Write property test for fragment group persistence
+- [x] 12.1 Write property test for fragment group persistence
   - **Property 17: Fragment Group Persistence**
   - **Validates: Requirements 10.1, 10.2**
 
-- [ ] 12.2 Write property test for fragment group episode inclusion
+- [x] 12.2 Write property test for fragment group episode inclusion
   - **Property 14: Fragment Group Episode Inclusion**
   - **Validates: Requirements 9.2, 9.3, 10.3**
 
-- [ ] 12.3 Write property test for fragment group scope limiting
+- [x] 12.3 Write property test for fragment group scope limiting
   - **Property 15: Fragment Group Scope Limiting**
   - **Validates: Requirements 9.4**
 
-- [ ] 12.4 Write property test for cross-episode attribution
+- [x] 12.4 Write property test for cross-episode attribution
   - **Property 16: Cross-Episode Attribution**
   - **Validates: Requirements 9.5, 10.5, 11.4**
 

@@ -4,3 +4,4 @@ export * from './script-ingestion';
 export * from './knowledge-base-service';
 export * from './profile-service';
 export * from './memory-service';
+export * from './fragment-group-service';
