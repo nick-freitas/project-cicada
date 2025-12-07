@@ -27,21 +27,21 @@ export function ChatPage() {
       {/* Connection status */}
       <div className="mb-4">
         {isReconnecting && (
-          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
-            <p className="text-sm text-yellow-700">Reconnecting...</p>
+          <div className="bg-yellow-900/50 border-l-4 border-yellow-500 p-4">
+            <p className="text-sm text-yellow-200">Reconnecting...</p>
           </div>
         )}
         {!isConnected && !isReconnecting && (
-          <div className="bg-red-50 border-l-4 border-red-400 p-4">
-            <p className="text-sm text-red-700">Disconnected</p>
+          <div className="bg-red-900/50 border-l-4 border-red-500 p-4">
+            <p className="text-sm text-red-200">Disconnected</p>
           </div>
         )}
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto bg-white rounded-lg shadow p-4 mb-4">
+      <div className="flex-1 overflow-y-auto bg-gray-800 rounded-lg shadow-lg p-4 mb-4 border border-gray-700">
         {messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-gray-500">
+          <div className="flex items-center justify-center h-full text-gray-400">
             <p>Start a conversation with CICADA</p>
           </div>
         ) : (
@@ -55,7 +55,7 @@ export function ChatPage() {
                   className={`max-w-3xl rounded-lg px-4 py-2 ${
                     message.role === 'user'
                       ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-900'
+                      : 'bg-gray-700 text-gray-100'
                   }`}
                 >
                   <div className="whitespace-pre-wrap">{message.content}</div>
@@ -82,12 +82,12 @@ export function ChatPage() {
           onChange={(e) => setInput(e.target.value)}
           placeholder="Ask CICADA about Higurashi..."
           disabled={!isConnected}
-          className="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+          className="flex-1 rounded-lg border-gray-700 bg-gray-800 text-white placeholder-gray-400 shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-900 disabled:cursor-not-allowed"
         />
         <button
           type="submit"
           disabled={!isConnected || !input.trim()}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-300 disabled:cursor-not-allowed"
+          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:bg-gray-700 disabled:cursor-not-allowed"
         >
           Send
         </button>
