@@ -32,6 +32,8 @@ const frontendStack = new FrontendStack(app, 'ProjectCICADAFrontendStack', {
   env,
   apiStack,
   authStack,
+  domainName: process.env.DOMAIN_NAME,
+  frontendSubdomain: process.env.FRONTEND_SUBDOMAIN,
 });
 
 // Monitoring layer - CloudWatch + AWS Budgets

@@ -3,6 +3,9 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
+import * as route53 from 'aws-cdk-lib/aws-route53';
+import * as route53Targets from 'aws-cdk-lib/aws-route53-targets';
+import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import { Construct } from 'constructs';
 import { APIStack } from './api-stack';
 import { AuthStack } from './auth-stack';
@@ -11,6 +14,8 @@ import * as path from 'path';
 export interface FrontendStackProps extends cdk.StackProps {
   apiStack: APIStack;
   authStack: AuthStack;
+  domainName?: string; // e.g., "example.com"
+  frontendSubdomain?: string; // e.g., "app.example.com" or "nonprod.example.com"
 }
 
 export class FrontendStack extends cdk.Stack {
@@ -39,6 +44,26 @@ export class FrontendStack extends cdk.Stack {
 
     // Grant CloudFront access to S3 bucket
     this.bucket.grantRead(originAccessIdentity);
+
+    // Custom domain setup (optional)
+    let certificate: acm.ICertificate | undefined;
+    let domainNames: string[] | undefined;
+    let hostedZone: route53.IHostedZone | undefined;
+
+    if (props.domainName && props.frontendSubdomain) {
+      // Look up the hosted zone
+      hostedZone = route53.HostedZone.fromLookup(this, 'HostedZone', {
+        domainName: props.domainName,
+      });
+
+      // Create ACM certificate in us-east-1 (required for CloudFront)
+      certificate = new acm.Certificate(this, 'Certificate', {
+        domainName: props.frontendSubdomain,
+        validation: acm.CertificateValidation.fromDns(hostedZone),
+      });
+
+      domainNames = [props.frontendSubdomain];
+    }
 
     // Create CloudFront distribution
     this.distribution = new cloudfront.Distribution(this, 'Distribution', {
@@ -69,7 +94,20 @@ export class FrontendStack extends cdk.Stack {
       ],
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100, // US, Canada, Europe only (cost optimization)
       comment: 'CICADA Frontend Distribution',
+      certificate: certificate,
+      domainNames: domainNames,
     });
+
+    // Create Route53 A record pointing to CloudFront (if custom domain is configured)
+    if (hostedZone && props.frontendSubdomain) {
+      new route53.ARecord(this, 'AliasRecord', {
+        zone: hostedZone,
+        recordName: props.frontendSubdomain,
+        target: route53.RecordTarget.fromAlias(
+          new route53Targets.CloudFrontTarget(this.distribution)
+        ),
+      });
+    }
 
     // Deploy frontend build to S3
     // Note: This will deploy the current build. Run `pnpm --filter @cicada/frontend run build` first
@@ -84,9 +122,16 @@ export class FrontendStack extends cdk.Stack {
 
     // Outputs
     new cdk.CfnOutput(this, 'FrontendURL', {
-      value: `https://${this.distribution.distributionDomainName}`,
-      description: 'CloudFront URL for frontend',
+      value: props.frontendSubdomain
+        ? `https://${props.frontendSubdomain}`
+        : `https://${this.distribution.distributionDomainName}`,
+      description: 'Frontend URL (custom domain or CloudFront)',
       exportName: 'CICADAFrontendURL',
+    });
+
+    new cdk.CfnOutput(this, 'CloudFrontURL', {
+      value: `https://${this.distribution.distributionDomainName}`,
+      description: 'CloudFront distribution URL',
     });
 
     new cdk.CfnOutput(this, 'BucketName', {
@@ -98,5 +143,12 @@ export class FrontendStack extends cdk.Stack {
       value: this.distribution.distributionId,
       description: 'CloudFront distribution ID',
     });
+
+    if (props.frontendSubdomain) {
+      new cdk.CfnOutput(this, 'CustomDomain', {
+        value: props.frontendSubdomain,
+        description: 'Custom domain name',
+      });
+    }
   }
 }
