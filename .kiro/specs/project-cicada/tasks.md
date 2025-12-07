@@ -156,7 +156,7 @@ dsass
   - **Property 32: Profile Usage in Responses**
   - **Validates: Requirements 14.3, 15.3, 16.3, 17.3, 18.3**
 
-- [ ] 10. Implement Theory Agent
+- [x] 10. Implement Theory Agent
   - Create Lambda function with Strands SDK
   - Implement theory analysis logic
   - Implement evidence gathering (invoke Query Agent)
@@ -165,15 +165,15 @@ dsass
   - Access theory profiles from DynamoDB
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 8.1, 8.2, 8.3, 8.4, 8.5_
 
-- [ ] 10.1 Write property test for theory citation inclusion
+- [x] 10.1 Write property test for theory citation inclusion
   - **Property 12: Theory Citation Inclusion**
   - **Validates: Requirements 8.5**
 
-- [ ] 10.2 Write property test for profile update on insight
+- [x] 10.2 Write property test for profile update on insight
   - **Property 13: Profile Update on Insight**
   - **Validates: Requirements 8.3**
 
-- [ ] 10.3 Write property test for profile correction propagation
+- [x] 10.3 Write property test for profile correction propagation
   - **Property 11: Profile Correction Propagation**
   - **Validates: Requirements 7.3**
 
