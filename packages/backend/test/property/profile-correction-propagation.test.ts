@@ -58,19 +58,20 @@ describe('Property 11: Profile Correction Propagation', () => {
   let profileService: ProfileService;
   let theoryAgent: TheoryAgent;
   let mockBedrockSend: jest.Mock;
+  let mockBedrockClient: any;
 
   beforeEach(() => {
     jest.clearAllMocks();
     mockProfiles = new Map();
     
-    // Mock Bedrock responses BEFORE creating instances
+    // Create mock Bedrock client
     mockBedrockSend = jest.fn();
-    (BedrockRuntimeClient as jest.Mock).mockImplementation(() => ({
+    mockBedrockClient = {
       send: mockBedrockSend,
-    }));
+    };
     
     profileService = new ProfileService();
-    theoryAgent = new TheoryAgent();
+    theoryAgent = new TheoryAgent(mockBedrockClient);
 
     // Mock DynamoDB operations to use in-memory storage
     mockSend.mockImplementation((command: any) => {

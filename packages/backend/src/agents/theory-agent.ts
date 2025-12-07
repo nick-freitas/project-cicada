@@ -4,7 +4,6 @@ import { profileService } from '../services/profile-service';
 import { TheoryProfile, Citation } from '@cicada/shared-types';
 import { logger } from '../utils/logger';
 
-const bedrockClient = new BedrockRuntimeClient({ region: process.env.AWS_REGION || 'us-east-1' });
 const MODEL_ID = process.env.MODEL_ID || 'amazon.nova-lite-v1:0';
 
 export interface TheoryAgentRequest {
@@ -58,6 +57,14 @@ export interface ProfileCorrection {
  * - Correct profiles when errors are discovered
  */
 export class TheoryAgent {
+  private bedrockClient: BedrockRuntimeClient;
+
+  constructor(bedrockClient?: BedrockRuntimeClient) {
+    this.bedrockClient = bedrockClient || new BedrockRuntimeClient({ 
+      region: process.env.AWS_REGION || 'us-east-1' 
+    });
+  }
+
   /**
    * Analyze a theory and provide evidence-based assessment
    */
@@ -249,7 +256,7 @@ Generate search queries to find evidence for or against this theory.`;
         system: [{ text: systemPrompt }],
       });
 
-      const response = await bedrockClient.send(command);
+      const response = await this.bedrockClient.send(command);
       const responseText = response.output?.message?.content?.[0]?.text || '';
 
       // Parse JSON array
@@ -332,7 +339,7 @@ Analyze this theory against the evidence.`;
         system: [{ text: systemPrompt }],
       });
 
-      const response = await bedrockClient.send(command);
+      const response = await this.bedrockClient.send(command);
       const responseText = response.output?.message?.content?.[0]?.text || '';
 
       // Parse JSON response
@@ -414,7 +421,7 @@ Identify any profile corrections needed.`;
         system: [{ text: systemPrompt }],
       });
 
-      const response = await bedrockClient.send(command);
+      const response = await this.bedrockClient.send(command);
       const responseText = response.output?.message?.content?.[0]?.text || '';
 
       // Parse JSON response
@@ -527,7 +534,7 @@ Suggest refinements to improve this theory.`;
         system: [{ text: systemPrompt }],
       });
 
-      const response = await bedrockClient.send(command);
+      const response = await this.bedrockClient.send(command);
       const responseText = response.output?.message?.content?.[0]?.text || '';
 
       // Parse JSON response
@@ -594,7 +601,7 @@ Identify profile updates from this analysis.`;
         system: [{ text: systemPrompt }],
       });
 
-      const response = await bedrockClient.send(command);
+      const response = await this.bedrockClient.send(command);
       const responseText = response.output?.message?.content?.[0]?.text || '';
 
       // Parse JSON response
@@ -745,7 +752,7 @@ Suggest theories based on patterns in this information.`;
         system: [{ text: systemPrompt }],
       });
 
-      const response = await bedrockClient.send(command);
+      const response = await this.bedrockClient.send(command);
       const responseText = response.output?.message?.content?.[0]?.text || '';
 
       // Parse JSON response
