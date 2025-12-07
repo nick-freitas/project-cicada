@@ -29,7 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  const login = async (username: string, password: string) => {
+  const login = async (username: string, _password: string) => {
     // TODO: Implement Cognito authentication
     const mockUser = {
       userId: 'user-123',

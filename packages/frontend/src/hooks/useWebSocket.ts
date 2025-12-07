@@ -39,7 +39,7 @@ export function useWebSocket(): UseWebSocketReturn {
       setIsReconnecting(false);
 
       // Resume any pending requests
-      pendingRequests.current.forEach((message, requestId) => {
+      pendingRequests.current.forEach((_message, requestId) => {
         ws.send(
           JSON.stringify({
             action: 'resume',

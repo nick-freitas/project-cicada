@@ -36,7 +36,7 @@ export async function verifyToken(event: APIGatewayProxyEvent): Promise<Authenti
     return {
       userId: payload.sub,
       username: payload.username || payload.sub,
-      email: payload.email,
+      email: typeof payload.email === 'string' ? payload.email : undefined,
     };
   } catch (error) {
     logger.error('Token verification failed', { error });
