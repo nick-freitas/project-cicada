@@ -206,13 +206,14 @@
       "Sid": "AWSBudgets",
       "Effect": "Allow",
       "Action": [
-        "budgets:CreateBudget",
-        "budgets:UpdateBudget",
-        "budgets:DeleteBudget",
-        "budgets:ViewBudget",
-        "budgets:ModifyBudget"
+        "budgets:*"
       ],
-      "Resource": "*"
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "us-east-1"
+        }
+      }
     },
     {
       "Sid": "EventBridge",
