@@ -1,17 +1,12 @@
 import * as cdk from 'aws-cdk-lib';
 import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
-import * as cloudwatchActions from 'aws-cdk-lib/aws-cloudwatch-actions';
-import * as sns from 'aws-cdk-lib/aws-sns';
-import * as snsSubscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 import * as budgets from 'aws-cdk-lib/aws-budgets';
 import { Construct } from 'constructs';
 import { DataStack } from './data-stack';
-import { ComputeStack } from './compute-stack';
 import { APIStack } from './api-stack';
 
 export interface MonitoringStackProps extends cdk.StackProps {
   dataStack: DataStack;
-  computeStack: ComputeStack;
   apiStack: APIStack;
   alertEmail?: string;
   monthlyBudgetLimit?: number; // Default: $100
@@ -19,9 +14,9 @@ export interface MonitoringStackProps extends cdk.StackProps {
 }
 
 export class MonitoringStack extends cdk.Stack {
-  public readonly costAlarmTopic: sns.Topic;
   public readonly dashboard: cloudwatch.Dashboard;
   public readonly monthlyBudget: budgets.CfnBudget;
+  public readonly dailyBudget: budgets.CfnBudget;
 
   constructor(scope: Construct, id: string, props: MonitoringStackProps) {
     super(scope, id, props);
@@ -29,17 +24,25 @@ export class MonitoringStack extends cdk.Stack {
     const monthlyLimit = props.monthlyBudgetLimit || 100;
     const dailyLimit = props.dailyBudgetLimit || 3.33;
 
-    // Create SNS topic for cost alerts
-    this.costAlarmTopic = new sns.Topic(this, 'CostAlarmTopic', {
-      displayName: 'CICADA Cost Alerts',
-      topicName: 'CICADA-Cost-Alerts',
-    });
+    // Build monthly budget notifications - alert at 80% threshold
+    const monthlyNotifications: budgets.CfnBudget.NotificationWithSubscribersProperty[] = [];
 
-    // Subscribe email to cost alerts if provided
+    // Monthly budget: 80% threshold notification (requires email)
     if (props.alertEmail) {
-      this.costAlarmTopic.addSubscription(
-        new snsSubscriptions.EmailSubscription(props.alertEmail)
-      );
+      monthlyNotifications.push({
+        notification: {
+          notificationType: 'ACTUAL',
+          comparisonOperator: 'GREATER_THAN',
+          threshold: 80,
+          thresholdType: 'PERCENTAGE',
+        },
+        subscribers: [
+          {
+            subscriptionType: 'EMAIL',
+            address: props.alertEmail,
+          },
+        ],
+      });
     }
 
     // Create AWS Budget for monthly cost tracking
@@ -69,65 +72,58 @@ export class MonitoringStack extends cdk.Stack {
           useBlended: false,
         },
       },
-      notificationsWithSubscribers: [
-        {
-          notification: {
-            notificationType: 'ACTUAL',
-            comparisonOperator: 'GREATER_THAN',
-            threshold: 80, // Alert at 80% of budget
-            thresholdType: 'PERCENTAGE',
-          },
-          subscribers: props.alertEmail
-            ? [
-                {
-                  subscriptionType: 'EMAIL',
-                  address: props.alertEmail,
-                },
-              ]
-            : [],
+      notificationsWithSubscribers: monthlyNotifications,
+    });
+
+    // Build daily budget notifications - alert at 100% threshold
+    const dailyNotifications: budgets.CfnBudget.NotificationWithSubscribersProperty[] = [];
+
+    // Daily budget: 100% threshold notification (requires email)
+    if (props.alertEmail) {
+      dailyNotifications.push({
+        notification: {
+          notificationType: 'ACTUAL',
+          comparisonOperator: 'GREATER_THAN',
+          threshold: 100,
+          thresholdType: 'PERCENTAGE',
         },
-        {
-          notification: {
-            notificationType: 'ACTUAL',
-            comparisonOperator: 'GREATER_THAN',
-            threshold: 100, // Alert at 100% of budget
-            thresholdType: 'PERCENTAGE',
+        subscribers: [
+          {
+            subscriptionType: 'EMAIL',
+            address: props.alertEmail,
           },
-          subscribers: props.alertEmail
-            ? [
-                {
-                  subscriptionType: 'EMAIL',
-                  address: props.alertEmail,
-                },
-                {
-                  subscriptionType: 'SNS',
-                  address: this.costAlarmTopic.topicArn,
-                },
-              ]
-            : [
-                {
-                  subscriptionType: 'SNS',
-                  address: this.costAlarmTopic.topicArn,
-                },
-              ],
+        ],
+      });
+    }
+
+    // Create AWS Budget for daily cost tracking
+    this.dailyBudget = new budgets.CfnBudget(this, 'DailyBudget', {
+      budget: {
+        budgetName: 'CICADA-Daily-Budget',
+        budgetType: 'COST',
+        timeUnit: 'DAILY',
+        budgetLimit: {
+          amount: dailyLimit,
+          unit: 'USD',
         },
-        {
-          notification: {
-            notificationType: 'FORECASTED',
-            comparisonOperator: 'GREATER_THAN',
-            threshold: 100, // Alert if forecasted to exceed budget
-            thresholdType: 'PERCENTAGE',
-          },
-          subscribers: props.alertEmail
-            ? [
-                {
-                  subscriptionType: 'EMAIL',
-                  address: props.alertEmail,
-                },
-              ]
-            : [],
+        costFilters: {
+          // Optional: Filter by tags if you want to track only CICADA resources
+          // TagKeyValue: ['user:Project$CICADA'],
         },
-      ],
+        costTypes: {
+          includeCredit: false,
+          includeDiscount: true,
+          includeOtherSubscription: true,
+          includeRecurring: true,
+          includeRefund: false,
+          includeSubscription: true,
+          includeSupport: false,
+          includeTax: false,
+          includeUpfront: true,
+          useBlended: false,
+        },
+      },
+      notificationsWithSubscribers: dailyNotifications,
     });
 
     // Create CloudWatch Dashboard
@@ -283,10 +279,9 @@ export class MonitoringStack extends cdk.Stack {
       description: 'Monthly budget limit in USD',
     });
 
-    new cdk.CfnOutput(this, 'CostAlarmTopicArn', {
-      value: this.costAlarmTopic.topicArn,
-      description: 'SNS Topic ARN for cost alerts',
-      exportName: 'CICAdaCostAlarmTopicArn',
+    new cdk.CfnOutput(this, 'DailyBudgetLimit', {
+      value: dailyLimit.toString(),
+      description: 'Daily budget limit in USD',
     });
   }
 }

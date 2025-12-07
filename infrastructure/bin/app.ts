@@ -2,8 +2,6 @@
 import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
 import { DataStack } from '../lib/data-stack';
-import { ComputeStack } from '../lib/compute-stack';
-import { AgentStack } from '../lib/agent-stack';
 import { APIStack } from '../lib/api-stack';
 import { AuthStack } from '../lib/auth-stack';
 import { FrontendStack } from '../lib/frontend-stack';
@@ -19,29 +17,15 @@ const env = {
 // Data layer - S3, DynamoDB, Knowledge Base
 const dataStack = new DataStack(app, 'ProjectCICADADataStack', { env });
 
-// Compute layer - Lambda functions
-const computeStack = new ComputeStack(app, 'ProjectCICADAComputeStack', {
-  env,
-  dataStack,
-});
+// Auth layer - Cognito
+const authStack = new AuthStack(app, 'ProjectCICADAAuthStack', { env });
 
-// Agent layer - AgentCore agents
-const agentStack = new AgentStack(app, 'ProjectCICADAAgentStack', {
-  env,
-  dataStack,
-  computeStack,
-});
-
-// API layer - API Gateway
+// API layer - API Gateway + Lambda functions
 const apiStack = new APIStack(app, 'ProjectCICADAAPIStack', {
   env,
   dataStack,
-  computeStack,
-  agentStack,
+  authStack,
 });
-
-// Auth layer - Cognito
-const authStack = new AuthStack(app, 'ProjectCICADAAuthStack', { env });
 
 // Frontend layer - S3 + CloudFront
 const frontendStack = new FrontendStack(app, 'ProjectCICADAFrontendStack', {
@@ -50,12 +34,12 @@ const frontendStack = new FrontendStack(app, 'ProjectCICADAFrontendStack', {
   authStack,
 });
 
-// Monitoring layer - CloudWatch
+// Monitoring layer - CloudWatch + AWS Budgets
 const monitoringStack = new MonitoringStack(app, 'ProjectCICADAMonitoringStack', {
   env,
   dataStack,
-  computeStack,
   apiStack,
+  alertEmail: process.env.ALERT_EMAIL,
 });
 
 app.synth();

@@ -206,14 +206,19 @@
       "Sid": "AWSBudgets",
       "Effect": "Allow",
       "Action": [
-        "budgets:*"
+        "budgets:DescribeBudgetAction",
+        "budgets:DescribeBudgetActionHistories",
+        "budgets:DescribeBudgetActionsForAccount",
+        "budgets:DescribeBudgetActionsForBudget",
+        "budgets:ListTagsForResource",
+        "budgets:ViewBudget",
+        "budgets:CreateBudgetAction",
+        "budgets:ExecuteBudgetAction",
+        "budgets:ModifyBudget",
+        "budgets:UpdateBudgetAction",
+        "budgets:TagResource"
       ],
-      "Resource": "*",
-      "Condition": {
-        "StringEquals": {
-          "aws:RequestedRegion": "us-east-1"
-        }
-      }
+      "Resource": "*"
     },
     {
       "Sid": "EventBridge",

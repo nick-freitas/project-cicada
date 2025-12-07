@@ -12,14 +12,12 @@ import * as tasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
 import * as events from 'aws-cdk-lib/aws-events';
 import * as eventsTargets from 'aws-cdk-lib/aws-events-targets';
 import { Construct } from 'constructs';
-import { ComputeStack } from './compute-stack';
-import { AgentStack } from './agent-stack';
 import { DataStack } from './data-stack';
 import * as path from 'path';
 
 export interface APIStackProps extends cdk.StackProps {
-  computeStack: ComputeStack;
-  agentStack: AgentStack;
+
+
   dataStack: DataStack;
   authStack?: any; // Will be properly typed when AuthStack is imported
 }

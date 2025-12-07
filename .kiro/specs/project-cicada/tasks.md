@@ -344,7 +344,7 @@ dsass
   - Test protected routes
   - _Requirements: 21.1, 21.2, 21.5_
 
-- [ ] 24. Deploy frontend to S3 + CloudFront
+- [x] 24. Deploy frontend to S3 + CloudFront
   - Create S3 bucket for frontend
   - Configure CloudFront distribution
   - Set up deployment pipeline
