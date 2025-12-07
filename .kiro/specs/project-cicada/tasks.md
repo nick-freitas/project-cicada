@@ -54,7 +54,7 @@
   - **Property 3: Embedding Generation Completeness**
   - **Validates: Requirements 1.3**
 
-- [ ] 4. Set up Bedrock Knowledge Base
+- [x] 4. Set up Bedrock Knowledge Base
   - Create S3 bucket for Knowledge Base
   - Configure Bedrock Knowledge Base with Titan Embeddings
   - Set up metadata filters (episodeId, chapterId, messageId, speaker)

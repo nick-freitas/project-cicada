@@ -197,37 +197,41 @@ export class ScriptIngestionService {
 
   /**
    * Index script data in Knowledge Base
+   * Generates embeddings and stores them with metadata filters
    */
   async indexInKnowledgeBase(data: ProcessedScriptData): Promise<void> {
     try {
-      // For each message, generate embedding and store in KB bucket
+      const { storeEmbedding, generateEmbedding } = await import('./knowledge-base-service');
+      
+      // Get episode name from config
+      const episodeConfig = await episodeConfigService.getConfigById(data.episodeId);
+      const episodeName = episodeConfig?.episodeName || data.episodeId;
+      
+      // For each message, generate embedding and store in KB
       for (const message of data.messages) {
         // Combine English and Japanese text for embedding
         const textForEmbedding = `${message.TextENG}\n${message.TextJPN}`;
         
-        const embedding = await this.generateEmbedding(textForEmbedding);
+        const embedding = await generateEmbedding(textForEmbedding);
         
-        // Store message with embedding in KB bucket
-        const kbKey = `kb/${data.episodeId}/${data.chapterId}/${message.MessageID}.json`;
-        
-        await s3Client.send(
-          new PutObjectCommand({
-            Bucket: KB_BUCKET,
-            Key: kbKey,
-            Body: JSON.stringify({
-              ...message,
-              embedding,
-              textForEmbedding,
-            }),
-            ContentType: 'application/json',
-            Metadata: {
-              episodeId: data.episodeId,
-              chapterId: data.chapterId,
-              messageId: message.MessageID.toString(),
-              speaker: message.speaker || 'unknown',
-            },
-          })
-        );
+        // Create embedding record with metadata filters
+        await storeEmbedding({
+          id: `${data.episodeId}-${data.chapterId}-${message.MessageID}`,
+          episodeId: data.episodeId,
+          chapterId: data.chapterId,
+          messageId: message.MessageID,
+          speaker: message.speaker,
+          textENG: message.TextENG,
+          textJPN: message.TextJPN,
+          embedding,
+          metadata: {
+            episodeName,
+            type: message.type,
+            chapterId: data.chapterId,
+            messageId: message.MessageID,
+            speaker: message.speaker || 'narrator',
+          },
+        });
       }
       
       logger.info('Indexed script data in Knowledge Base', {
