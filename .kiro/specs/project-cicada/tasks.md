@@ -13,7 +13,7 @@
   - Test TypeScript compilation
   - _Requirements: 28.1, 28.5_
 
-- [ ] 2. Implement episode configuration and metadata management
+- [x] 2. Implement episode configuration and metadata management
   - Create EpisodeConfig data model
   - Implement episode configuration parser
   - Create DynamoDB table for episode configuration
@@ -21,15 +21,15 @@
   - Support both file pattern and human-readable name queries
   - _Requirements: 1.4, 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [ ] 2.1 Write property test for episode resolution
+- [x] 2.1 Write property test for episode resolution
   - **Property 4: Episode Resolution Correctness**
   - **Validates: Requirements 1.4, 2.3**
 
-- [ ] 2.2 Write property test for configuration storage
+- [x] 2.2 Write property test for configuration storage
   - **Property 5: Configuration Storage Fidelity**
   - **Validates: Requirements 2.2**
 
-- [ ] 2.3 Write property test for query name equivalence
+- [x] 2.3 Write property test for query name equivalence
   - **Property 6: Query Name Equivalence**
   - **Validates: Requirements 2.5**
 

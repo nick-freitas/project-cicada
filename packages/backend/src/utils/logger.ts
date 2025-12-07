@@ -26,3 +26,6 @@ export class Logger {
     console.debug(JSON.stringify({ level: 'debug', context: this.context, message, ...meta }));
   }
 }
+
+// Default logger instance
+export const logger = new Logger('cicada');
