@@ -5,10 +5,16 @@
 - **TypeScript**: All code (frontend, backend, infrastructure) uses TypeScript with strict type checking
 - **Shared Types**: Common types package shared across frontend and backend
 
+## Package Management
+
+- **pnpm**: Use pnpm for all package management (faster, more efficient than npm)
+- **Workspaces**: Monorepo managed with pnpm workspaces
+
 ## Frontend
 
 - **Framework**: React 18+ with TypeScript
 - **Build Tool**: Vite
+- **Styling**: Tailwind CSS for utility-first styling
 - **Routing**: React Router
 - **State Management**: Context API
 - **WebSocket Client**: Native WebSocket API for real-time streaming
@@ -16,7 +22,16 @@
 
 ## Backend
 
-- **Infrastructure as Code**: AWS CDK in TypeScript
+- **Infrastructure as Code**: AWS CDK (Cloud Development Kit) in TypeScript
+  - **NOT CloudFormation directly** - always use CDK constructs
+  - Infrastructure split into separate stacks for independent deployment:
+    - `DataStack`: DynamoDB tables, S3 buckets, Knowledge Base
+    - `ComputeStack`: Lambda functions, Step Functions
+    - `AgentStack`: AgentCore agents (Orchestrator, Query, Theory, Profile)
+    - `APIStack`: API Gateway (REST + WebSocket), SQS queues
+    - `AuthStack`: Cognito User Pool and clients
+    - `FrontendStack`: S3 + CloudFront for static hosting
+    - `MonitoringStack`: CloudWatch alarms, dashboards, cost monitoring
 - **Compute**: AWS Lambda (serverless)
 - **Agent Framework**: AWS AgentCore with Strands SDK (TypeScript)
 - **AI Models**: Amazon Bedrock (Nova Lite/Micro or Maverick)
@@ -40,47 +55,67 @@
 ### Frontend
 ```bash
 # Development
-cd frontend
-npm install
-npm run dev
+cd packages/frontend
+pnpm install
+pnpm run dev
 
 # Build
-npm run build
+pnpm run build
 
 # Test
-npm test
-npm run test:e2e
+pnpm test
+pnpm run test:e2e
 ```
 
 ### Backend
 ```bash
 # Development
-cd backend
-npm install
-npm run build
-
-# Deploy
-npm run cdk:synth
-npm run cdk:deploy
+cd packages/backend
+pnpm install
+pnpm run build
 
 # Test
-npm test
-npm run test:integration
+pnpm test
+pnpm run test:integration
+pnpm run test:property
 ```
 
-### Infrastructure
+### Infrastructure (AWS CDK)
 ```bash
-# Synthesize CloudFormation
-cdk synth
+cd infrastructure
+
+# Install dependencies
+pnpm install
+
+# Synthesize CDK to CloudFormation (review before deploying)
+pnpm run synth
 
 # Deploy all stacks
-cdk deploy --all
+pnpm run deploy
 
-# Deploy specific stack
+# Deploy specific stack (recommended for targeted updates)
 cdk deploy CICADADataStack
+cdk deploy CICADAAuthStack
+cdk deploy CICADAAPIStack
+cdk deploy CICADAMonitoringStack
 
 # Destroy infrastructure
 cdk destroy --all
+
+# List all stacks
+cdk list
+```
+
+### Monorepo Commands (from root)
+```bash
+# Install all dependencies
+pnpm install
+
+# Build all packages
+pnpm run build
+
+# Run tests across all packages
+pnpm test
 ```
 
 ## Architecture Patterns
@@ -90,3 +125,21 @@ cdk destroy --all
 - **Multi-Agent**: Specialized agents (Query, Theory, Profile) coordinated by Orchestrator
 - **Streaming**: Real-time response delivery via WebSocket with reconnection support
 - **User-Scoped**: All data (profiles, theories, memory) isolated per user
+- **Modular Infrastructure**: CDK stacks are split by concern for independent deployment
+  - Deploy only what changed (e.g., update API without touching data layer)
+  - Reduces deployment time and risk
+  - Clear separation of concerns
+
+## Infrastructure Deployment Strategy
+
+When deploying infrastructure changes:
+
+1. **Always use CDK** - Never write CloudFormation directly
+2. **Deploy stacks independently** when possible:
+   - Data layer changes: `cdk deploy CICADADataStack`
+   - API changes: `cdk deploy CICADAAPIStack`
+   - Auth changes: `cdk deploy CICADAAuthStack`
+   - Monitoring changes: `cdk deploy CICADAMonitoringStack`
+3. **Use `cdk diff`** before deploying to review changes
+4. **Deploy all stacks** only when necessary: `cdk deploy --all`
+5. **Stack dependencies** are managed automatically by CDK
