@@ -33,7 +33,7 @@
   - **Property 6: Query Name Equivalence**
   - **Validates: Requirements 2.5**
 
-- [ ] 3. Implement script data ingestion pipeline
+- [x] 3. Implement script data ingestion pipeline
   - Create Lambda function for JSON parsing
   - Implement S3 event trigger for new script files
   - Parse script JSON and extract all required fields
@@ -42,15 +42,15 @@
   - Store in S3 and index in Knowledge Base
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
-- [ ] 3.1 Write property test for JSON parsing
+- [x] 3.1 Write property test for JSON parsing
   - **Property 1: JSON Parsing Completeness**
   - **Validates: Requirements 1.1**
 
-- [ ] 3.2 Write property test for storage-retrieval
+- [x] 3.2 Write property test for storage-retrieval
   - **Property 2: Storage-Retrieval Round Trip**
   - **Validates: Requirements 1.2**
 
-- [ ] 3.3 Write property test for embedding generation
+- [x] 3.3 Write property test for embedding generation
   - **Property 3: Embedding Generation Completeness**
   - **Validates: Requirements 1.3**
 
