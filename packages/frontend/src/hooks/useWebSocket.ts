@@ -105,7 +105,7 @@ export function useWebSocket(): UseWebSocketReturn {
         setIsReconnecting(true);
         reconnectTimeoutRef.current = setTimeout(() => {
           connect();
-        }, 2000);
+        }, 2000) as unknown as number;
       }
     };
 

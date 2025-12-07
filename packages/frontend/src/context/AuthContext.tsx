@@ -1,4 +1,16 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { Amplify } from 'aws-amplify';
+import { signIn, signOut, getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
+
+// Configure Amplify
+Amplify.configure({
+  Auth: {
+    Cognito: {
+      userPoolId: import.meta.env.VITE_USER_POOL_ID,
+      userPoolClientId: import.meta.env.VITE_USER_POOL_CLIENT_ID,
+    },
+  },
+});
 
 interface User {
   userId: string;
@@ -21,28 +33,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing session
-    const storedUser = localStorage.getItem('cicada_user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
+    // Check for existing Cognito session
+    checkAuthSession();
   }, []);
 
-  const login = async (username: string, _password: string) => {
-    // TODO: Implement Cognito authentication
-    const mockUser = {
-      userId: 'user-123',
-      username,
-      email: `${username}@project-cicada.com`,
-    };
-    setUser(mockUser);
-    localStorage.setItem('cicada_user', JSON.stringify(mockUser));
+  const checkAuthSession = async () => {
+    try {
+      const currentUser = await getCurrentUser();
+      const session = await fetchAuthSession();
+      
+      if (session.tokens) {
+        setUser({
+          userId: currentUser.userId,
+          username: currentUser.username,
+        });
+      }
+    } catch (error) {
+      // No active session
+      setUser(null);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('cicada_user');
+  const login = async (username: string, password: string) => {
+    try {
+      const { isSignedIn, nextStep } = await signIn({ username, password });
+      
+      if (isSignedIn) {
+        const currentUser = await getCurrentUser();
+        setUser({
+          userId: currentUser.userId,
+          username: currentUser.username,
+        });
+      } else if (nextStep.signInStep === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED') {
+        throw new Error('Password change required. Please contact administrator.');
+      } else {
+        throw new Error(`Authentication requires additional step: ${nextStep.signInStep}`);
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await signOut();
+      setUser(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+      throw error;
+    }
   };
 
   return (
