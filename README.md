@@ -92,7 +92,14 @@ pnpm run test:property
 
 ## Documentation
 
-See `.kiro/specs/project-cicada/` for detailed:
-- Requirements
-- Design
-- Implementation tasks
+### Deployment & Setup Guides
+- [Deployment Guide](docs/DEPLOYMENT.md) - Step-by-step deployment instructions
+- [Environment Setup](docs/ENV_SETUP.md) - Environment variable configuration
+- [IAM Setup](docs/IAM_SETUP.md) - AWS IAM user and permissions setup
+- [Custom Domain Setup](docs/CUSTOM_DOMAIN_SETUP.md) - Configure custom domain for frontend
+- [AWS Budgets Guide](docs/AWS_BUDGETS_GUIDE.md) - Cost monitoring and budget alerts
+- [Nonprod Deployment Outputs](docs/NONPROD_DEPLOYMENT_OUTPUTS.md) - Current nonprod deployment details
+
+### Architecture & Development
+- [Infrastructure Cleanup](docs/INFRASTRUCTURE_CLEANUP.md) - Stack simplification notes
+- [Spec Files](.kiro/specs/project-cicada/) - Requirements, design, and implementation tasks

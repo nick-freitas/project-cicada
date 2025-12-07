@@ -16,7 +16,7 @@ brew install awscli  # macOS
 # or follow: https://aws.amazon.com/cli/
 
 # Set up IAM user with least-privilege permissions
-# See IAM_SETUP.md for detailed instructions
+# See docs/IAM_SETUP.md for detailed instructions
 # OR use your existing admin credentials
 
 # Configure AWS credentials
@@ -30,7 +30,7 @@ aws sts get-caller-identity
 # This will show your AWS Account ID
 ```
 
-**Security Note:** For production deployments, create a dedicated IAM user with minimal permissions. See `IAM_SETUP.md` for a least-privilege policy.
+**Security Note:** For production deployments, create a dedicated IAM user with minimal permissions. See [IAM_SETUP.md](IAM_SETUP.md) for a least-privilege policy.
 
 ### 2. Set Up Environment File
 
