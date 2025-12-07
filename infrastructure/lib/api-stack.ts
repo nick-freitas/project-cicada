@@ -7,6 +7,10 @@ import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as sfn from 'aws-cdk-lib/aws-stepfunctions';
+import * as tasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as eventsTargets from 'aws-cdk-lib/aws-events-targets';
 import { Construct } from 'constructs';
 import { ComputeStack } from './compute-stack';
 import { AgentStack } from './agent-stack';
@@ -17,12 +21,14 @@ export interface APIStackProps extends cdk.StackProps {
   computeStack: ComputeStack;
   agentStack: AgentStack;
   dataStack: DataStack;
+  authStack?: any; // Will be properly typed when AuthStack is imported
 }
 
 export class APIStack extends cdk.Stack {
   public readonly webSocketApi: apigatewayv2.WebSocketApi;
   public readonly webSocketStage: apigatewayv2.WebSocketStage;
   public readonly messageQueue: sqs.Queue;
+  public readonly agentOrchestrationStateMachine: sfn.StateMachine;
 
   constructor(scope: Construct, id: string, props: APIStackProps) {
     super(scope, id, props);
@@ -173,6 +179,56 @@ export class APIStack extends cdk.Stack {
       })
     );
 
+    // Create Step Functions state machine for agent orchestration
+    const orchestratorTask = new tasks.LambdaInvoke(this, 'InvokeOrchestrator', {
+      lambdaFunction: messageProcessor,
+      payload: sfn.TaskInput.fromObject({
+        'requestId.$': '$.requestId',
+        'userId.$': '$.userId',
+        'connectionId.$': '$.connectionId',
+        'query.$': '$.query',
+      }),
+      resultPath: '$.orchestratorResult',
+    });
+
+    // Add error handling with retry logic
+    orchestratorTask.addRetry({
+      errors: ['States.TaskFailed', 'States.Timeout'],
+      interval: cdk.Duration.seconds(2),
+      maxAttempts: 3,
+      backoffRate: 2,
+    });
+
+    // Add catch for failures
+    const failureState = new sfn.Fail(this, 'AgentProcessingFailed', {
+      cause: 'Agent processing failed after retries',
+      error: 'AgentError',
+    });
+
+    orchestratorTask.addCatch(failureState, {
+      resultPath: '$.error',
+    });
+
+    // Create the state machine
+    this.agentOrchestrationStateMachine = new sfn.StateMachine(this, 'AgentOrchestration', {
+      stateMachineName: 'CICADA-Agent-Orchestration',
+      definition: orchestratorTask,
+      timeout: cdk.Duration.minutes(5),
+    });
+
+    // Create EventBridge rule to trigger Step Functions from SQS
+    const sqsToStepFunctionsRule = new events.Rule(this, 'SQSToStepFunctions', {
+      eventPattern: {
+        source: ['aws.sqs'],
+        detailType: ['SQS Message'],
+      },
+    });
+
+    sqsToStepFunctionsRule.addTarget(
+      new eventsTargets.SfnStateMachine(this.agentOrchestrationStateMachine)
+    );
+
+    // Alternative: Keep direct SQS trigger for simpler processing
     // Add SQS trigger to message processor
     messageProcessor.addEventSource(
       new lambdaEventSources.SqsEventSource(this.messageQueue, {
@@ -200,6 +256,8 @@ export class APIStack extends cdk.Stack {
       memorySize: 512,
       environment: {
         USER_PROFILES_TABLE: props.dataStack.userProfilesTable.tableName,
+        USER_POOL_ID: props.authStack?.userPool?.userPoolId || '',
+        USER_POOL_CLIENT_ID: props.authStack?.userPoolClient?.userPoolClientId || '',
       },
       bundling: {
         externalModules: ['@aws-sdk/*'],
@@ -243,6 +301,12 @@ export class APIStack extends cdk.Stack {
       value: restApi.url,
       description: 'REST API URL',
       exportName: 'CICADARestAPIURL',
+    });
+
+    new cdk.CfnOutput(this, 'StateMachineArn', {
+      value: this.agentOrchestrationStateMachine.stateMachineArn,
+      description: 'Agent Orchestration State Machine ARN',
+      exportName: 'CICADAStateMachineArn',
     });
   }
 }

@@ -246,7 +246,7 @@ dsass
   - **Property 36: Request Completion**
   - **Validates: Requirements 23.5**
 
-- [ ] 15. Implement Step Functions orchestration
+- [x] 15. Implement Step Functions orchestration
   - Create Step Function for agent workflow
   - Implement SQS queue for message processing
   - Implement EventBridge rules for async processing
@@ -254,7 +254,7 @@ dsass
   - Handle agent failures and retries
   - _Requirements: 24.3, 24.4, 24.5_
 
-- [ ] 15.1 Write integration test for Step Functions workflow
+- [x] 15.1 Write integration test for Step Functions workflow
   - Test end-to-end agent orchestration
   - Test failure handling and retries
   - _Requirements: 24.3, 24.4, 24.5_
@@ -273,30 +273,30 @@ dsass
   - Test user isolation
   - _Requirements: 19.1-19.7_
 
-- [ ] 17. Implement Cognito authentication
+- [x] 17. Implement Cognito authentication
   - Create Cognito User Pool
   - Configure user pool with 3 initial users
   - Implement JWT token validation
   - Integrate with API Gateway
   - _Requirements: 21.1, 21.2, 21.3, 21.4, 21.5_
 
-- [ ] 17.1 Write integration test for authentication flow
+- [x] 17.1 Write integration test for authentication flow
   - Test user login
   - Test token validation
   - Test session management
   - _Requirements: 21.1-21.5_
 
-- [ ] 18. Implement cost monitoring and alarms
+- [x] 18. Implement cost monitoring and alarms
   - Create CloudWatch alarm for daily cost > $3
   - Create cost dashboard
   - Implement usage metrics tracking
   - Set up alert notifications
   - _Requirements: 27.1, 27.2, 27.6_
 
-- [ ] 19. Checkpoint - Ensure all backend integration tests pass
+- [x] 19. Checkpoint - Ensure all backend integration tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 20. Implement React frontend structure
+- [x] 20. Implement React frontend structure
   - Initialize Vite + React + TypeScript project
   - Set up React Router
   - Create layout components
@@ -304,7 +304,7 @@ dsass
   - Configure build and deployment
   - _Requirements: 22.1, 22.6_
 
-- [ ] 21. Implement Chat UI with WebSocket streaming
+- [x] 21. Implement Chat UI with WebSocket streaming
   - Create chat interface component
   - Implement WebSocket client
   - Implement message sending with requestId generation
@@ -314,32 +314,32 @@ dsass
   - Display linguistic nuance annotations
   - _Requirements: 22.1, 22.2, 22.3, 22.4, 22.5, 22.7_
 
-- [ ] 21.1 Write E2E test for chat interaction
+- [x] 21.1 Write E2E test for chat interaction
   - Test message sending
   - Test response streaming
   - Test reconnection
   - _Requirements: 22.2, 22.3, 22.4_
 
-- [ ] 22. Implement Profile Management UI
+- [x] 22. Implement Profile Management UI
   - Create profile list views (Character, Location, Episode, Fragment Group, Theory)
   - Create profile detail views
   - Create profile edit forms
   - Implement profile API integration
   - _Requirements: 19.1, 19.2, 19.3, 19.4, 19.5, 19.6, 19.7_
 
-- [ ] 22.1 Write E2E test for profile management
+- [x] 22.1 Write E2E test for profile management
   - Test profile viewing
   - Test profile editing
   - _Requirements: 19.1-19.7_
 
-- [ ] 23. Implement authentication UI
+- [x] 23. Implement authentication UI
   - Create login page
   - Integrate with Cognito
   - Implement session management
   - Implement protected routes
   - _Requirements: 21.1, 21.2, 21.5_
 
-- [ ] 23.1 Write E2E test for authentication
+- [x] 23.1 Write E2E test for authentication
   - Test login flow
   - Test protected routes
   - _Requirements: 21.1, 21.2, 21.5_
