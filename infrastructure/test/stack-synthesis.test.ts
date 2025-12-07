@@ -36,7 +36,7 @@ describe('CDK Stack Synthesis', () => {
     const dataStack = new DataStack(app, 'TestDataStack');
     const computeStack = new ComputeStack(app, 'TestComputeStack', { dataStack });
     const agentStack = new AgentStack(app, 'TestAgentStack', { dataStack, computeStack });
-    const stack = new APIStack(app, 'TestAPIStack', { computeStack, agentStack });
+    const stack = new APIStack(app, 'TestAPIStack', { dataStack, computeStack, agentStack });
     expect(() => app.synth()).not.toThrow();
   });
 
@@ -49,7 +49,7 @@ describe('CDK Stack Synthesis', () => {
     const dataStack = new DataStack(app, 'TestDataStack');
     const computeStack = new ComputeStack(app, 'TestComputeStack', { dataStack });
     const agentStack = new AgentStack(app, 'TestAgentStack', { dataStack, computeStack });
-    const apiStack = new APIStack(app, 'TestAPIStack', { computeStack, agentStack });
+    const apiStack = new APIStack(app, 'TestAPIStack', { dataStack, computeStack, agentStack });
     const authStack = new AuthStack(app, 'TestAuthStack');
     const stack = new FrontendStack(app, 'TestFrontendStack', { apiStack, authStack });
     expect(() => app.synth()).not.toThrow();
@@ -59,7 +59,7 @@ describe('CDK Stack Synthesis', () => {
     const dataStack = new DataStack(app, 'TestDataStack');
     const computeStack = new ComputeStack(app, 'TestComputeStack', { dataStack });
     const agentStack = new AgentStack(app, 'TestAgentStack', { dataStack, computeStack });
-    const apiStack = new APIStack(app, 'TestAPIStack', { computeStack, agentStack });
+    const apiStack = new APIStack(app, 'TestAPIStack', { dataStack, computeStack, agentStack });
     const stack = new MonitoringStack(app, 'TestMonitoringStack', {
       dataStack,
       computeStack,
@@ -72,7 +72,7 @@ describe('CDK Stack Synthesis', () => {
     const dataStack = new DataStack(app, 'TestDataStack');
     const computeStack = new ComputeStack(app, 'TestComputeStack', { dataStack });
     const agentStack = new AgentStack(app, 'TestAgentStack', { dataStack, computeStack });
-    const apiStack = new APIStack(app, 'TestAPIStack', { computeStack, agentStack });
+    const apiStack = new APIStack(app, 'TestAPIStack', { dataStack, computeStack, agentStack });
     const authStack = new AuthStack(app, 'TestAuthStack');
     const frontendStack = new FrontendStack(app, 'TestFrontendStack', { apiStack, authStack });
     const monitoringStack = new MonitoringStack(app, 'TestMonitoringStack', {

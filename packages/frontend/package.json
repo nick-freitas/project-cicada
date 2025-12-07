@@ -6,11 +6,12 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "jest",
+    "test": "echo 'No unit tests configured for frontend. E2E tests would use Playwright.'",
+    "test:e2e": "echo 'E2E tests not yet configured'",
     "lint": "eslint . --ext ts,tsx"
   },
   "dependencies": {
-    "@cicada/shared-types": "^1.0.0",
+    "@cicada/shared-types": "workspace:*",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.0.0",

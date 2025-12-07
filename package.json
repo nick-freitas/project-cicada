@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "description": "CICADA - Contextual Inference & Comprehensive Analysis Data Agent",
-  "packageManager": "pnpm@8.0.0",
+  "packageManager": "pnpm@10.24.0",
   "engines": {
     "node": ">=18.0.0",
-    "pnpm": ">=8.0.0"
+    "pnpm": ">=10.0.0"
   },
   "workspaces": [
     "packages/*",
@@ -14,7 +14,10 @@
   ],
   "scripts": {
     "build": "pnpm -r run build",
-    "test": "pnpm -r run test",
+    "test": "pnpm -r --no-bail run test",
+    "test:unit": "pnpm --filter @cicada/backend run test:unit && pnpm --filter @cicada/shared-types run test && pnpm --filter @cicada/infrastructure run test",
+    "test:integration": "pnpm --filter @cicada/backend run test:integration",
+    "test:property": "pnpm --filter @cicada/backend run test:property",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,json,md}\"",
@@ -26,6 +29,7 @@
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
+    "esbuild": "^0.27.1",
     "eslint": "^8.0.0",
     "eslint-config-prettier": "^9.0.0",
     "prettier": "^3.0.0",

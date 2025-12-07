@@ -104,14 +104,19 @@ describe('Type Definitions', () => {
 
   describe('RequestTracking', () => {
     test('accepts valid request tracking', () => {
+      const now = Date.now();
       const tracking: RequestTracking = {
         requestId: 'req-001',
         userId: 'user-001',
         connectionId: 'conn-001',
         status: 'processing',
-        query: 'What happened in Onikakushi?',
+        message: 'What happened in Onikakushi?',
+        sessionId: 'session-001',
         responseChunks: [],
-        createdAt: '2024-01-01T00:00:00Z',
+        accumulatedResponse: '',
+        createdAt: now,
+        updatedAt: now,
+        ttl: now + 86400000, // 24 hours
       };
 
       expect(tracking.status).toBe('processing');
