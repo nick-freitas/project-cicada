@@ -139,7 +139,7 @@ dsass
   - **Property 10: Inference Transparency**
   - **Validates: Requirements 5.5**
 
-- [ ] 9. Implement Profile Agent
+- [x] 9. Implement Profile Agent
   - Create Lambda function with Strands SDK
   - Implement information extraction from conversations
   - Implement profile creation logic
@@ -148,11 +148,11 @@ dsass
   - Maintain user-specific profile isolation
   - _Requirements: 14.1-14.5, 15.1-15.5, 16.1-16.5, 17.1-17.5, 18.1-18.5_
 
-- [ ] 9.1 Write property test for profile information extraction
+- [x] 9.1 Write property test for profile information extraction
   - **Property 30: Profile Information Extraction**
   - **Validates: Requirements 14.1, 15.1, 16.1, 17.1, 18.1**
 
-- [ ] 9.2 Write property test for profile usage in responses
+- [x] 9.2 Write property test for profile usage in responses
   - **Property 32: Profile Usage in Responses**
   - **Validates: Requirements 14.3, 15.3, 16.3, 17.3, 18.3**
 
