@@ -1,11 +1,15 @@
-# CICADA - Contextual Inference & Comprehensive Analysis Data Agent
+# Project CICADA
+
+**CICADA** - Contextual Inference & Comprehensive Analysis Data Agent
 
 A full-stack AI agent system for analyzing the visual novel "Higurashi no Naku Koro Ni".
+
+**Domain:** project-cicada.com
 
 ## Project Structure
 
 ```
-cicada-agent/
+project-cicada/
 ├── packages/
 │   ├── shared-types/      # Shared TypeScript types
 │   ├── frontend/          # React application (Vite)
@@ -13,6 +17,10 @@ cicada-agent/
 ├── infrastructure/        # AWS CDK stacks
 └── .kiro/                # Spec-driven development files
 ```
+
+## About
+
+Project CICADA is designed to help users explore and analyze the complex narrative of Higurashi no Naku Koro Ni through natural conversation with specialized AI agents. The system maintains strict episode boundaries to prevent mixing contradictory information from different story fragments while supporting cross-episode analysis when explicitly requested.
 
 ## Getting Started
 
@@ -78,7 +86,7 @@ npm run test:property
 
 ## Documentation
 
-See `.kiro/specs/cicada-agent/` for detailed:
+See `.kiro/specs/project-cicada/` for detailed:
 - Requirements
 - Design
 - Implementation tasks

@@ -17,40 +17,40 @@ const env = {
 };
 
 // Data layer - S3, DynamoDB, Knowledge Base
-const dataStack = new DataStack(app, 'CICADADataStack', { env });
+const dataStack = new DataStack(app, 'ProjectCICADADataStack', { env });
 
 // Compute layer - Lambda functions
-const computeStack = new ComputeStack(app, 'CICADAComputeStack', {
+const computeStack = new ComputeStack(app, 'ProjectCICADAComputeStack', {
   env,
   dataStack,
 });
 
 // Agent layer - AgentCore agents
-const agentStack = new AgentStack(app, 'CICADAAgentStack', {
+const agentStack = new AgentStack(app, 'ProjectCICADAAgentStack', {
   env,
   dataStack,
   computeStack,
 });
 
 // API layer - API Gateway
-const apiStack = new APIStack(app, 'CICADAAPIStack', {
+const apiStack = new APIStack(app, 'ProjectCICADAAPIStack', {
   env,
   computeStack,
   agentStack,
 });
 
 // Auth layer - Cognito
-const authStack = new AuthStack(app, 'CICADAAuthStack', { env });
+const authStack = new AuthStack(app, 'ProjectCICADAAuthStack', { env });
 
 // Frontend layer - S3 + CloudFront
-const frontendStack = new FrontendStack(app, 'CICADAFrontendStack', {
+const frontendStack = new FrontendStack(app, 'ProjectCICADAFrontendStack', {
   env,
   apiStack,
   authStack,
 });
 
 // Monitoring layer - CloudWatch
-const monitoringStack = new MonitoringStack(app, 'CICADAMonitoringStack', {
+const monitoringStack = new MonitoringStack(app, 'ProjectCICADAMonitoringStack', {
   env,
   dataStack,
   computeStack,
