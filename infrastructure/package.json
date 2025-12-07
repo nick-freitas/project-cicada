@@ -11,6 +11,15 @@
     "cdk": "cdk",
     "synth": "cdk synth",
     "deploy": "cdk deploy --all",
+    "deploy:data": "cdk deploy CICADADataStack",
+    "deploy:compute": "cdk deploy CICADAComputeStack",
+    "deploy:agent": "cdk deploy CICADAAgentStack",
+    "deploy:api": "cdk deploy CICADAAPIStack",
+    "deploy:auth": "cdk deploy CICADAAuthStack",
+    "deploy:frontend": "cdk deploy CICADAFrontendStack",
+    "deploy:monitoring": "cdk deploy CICADAMonitoringStack",
+    "diff": "cdk diff",
+    "list": "cdk list",
     "destroy": "cdk destroy --all"
   },
   "dependencies": {

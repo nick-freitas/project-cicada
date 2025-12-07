@@ -3,16 +3,25 @@
   "version": "1.0.0",
   "private": true,
   "description": "CICADA - Contextual Inference & Comprehensive Analysis Data Agent",
+  "packageManager": "pnpm@8.0.0",
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
   "workspaces": [
     "packages/*",
     "infrastructure"
   ],
   "scripts": {
-    "build": "npm run build --workspaces",
-    "test": "npm run test --workspaces",
+    "build": "pnpm -r run build",
+    "test": "pnpm -r run test",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
-    "format:check": "prettier --check \"**/*.{ts,tsx,json,md}\""
+    "format:check": "prettier --check \"**/*.{ts,tsx,json,md}\"",
+    "dev:frontend": "pnpm --filter @cicada/frontend run dev",
+    "dev:backend": "pnpm --filter @cicada/backend run build",
+    "deploy": "pnpm --filter @cicada/infrastructure run deploy",
+    "synth": "pnpm --filter @cicada/infrastructure run synth"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^6.0.0",

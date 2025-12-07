@@ -27,6 +27,7 @@ Project CICADA is designed to help users explore and analyze the complex narrati
 ### Prerequisites
 
 - Node.js 18+
+- pnpm (`npm install -g pnpm`)
 - AWS CLI configured
 - AWS CDK CLI (`npm install -g aws-cdk`)
 
@@ -34,10 +35,10 @@ Project CICADA is designed to help users explore and analyze the complex narrati
 
 ```bash
 # Install dependencies for all packages
-npm install
+pnpm install
 
 # Build all packages
-npm run build
+pnpm run build
 ```
 
 ### Development
@@ -45,44 +46,49 @@ npm run build
 #### Frontend
 ```bash
 cd packages/frontend
-npm run dev
+pnpm run dev
 ```
 
 #### Backend
 ```bash
 cd packages/backend
-npm run build
-npm test
+pnpm run build
+pnpm test
 ```
 
-#### Infrastructure
+#### Infrastructure (AWS CDK)
 ```bash
 cd infrastructure
-npm run synth    # Synthesize CloudFormation
-npm run deploy   # Deploy to AWS
+pnpm run synth    # Synthesize CDK to CloudFormation
+pnpm run deploy   # Deploy all stacks
+
+# Deploy specific stack (recommended)
+cdk deploy CICADADataStack
+cdk deploy CICADAAPIStack
 ```
 
 ## Testing
 
 ```bash
 # Run all tests
-npm test
+pnpm test
 
 # Run tests for specific package
 cd packages/backend
-npm run test:unit
-npm run test:integration
-npm run test:property
+pnpm run test:unit
+pnpm run test:integration
+pnpm run test:property
 ```
 
 ## Architecture
 
-- **Frontend**: React + Vite + TypeScript
+- **Frontend**: React + Vite + TypeScript + Tailwind CSS
 - **Backend**: AWS Lambda + AgentCore + Strands SDK
-- **Infrastructure**: AWS CDK (TypeScript)
+- **Infrastructure**: AWS CDK (TypeScript) - Modular stacks for independent deployment
 - **AI**: Amazon Bedrock (Nova/Maverick)
 - **Database**: DynamoDB
 - **Storage**: S3 + Bedrock Knowledge Base
+- **Package Manager**: pnpm (monorepo with workspaces)
 
 ## Documentation
 
