@@ -3,8 +3,11 @@ import * as bedrock from 'aws-cdk-lib/aws-bedrock';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import { Construct } from 'constructs';
 import { DataStack } from './data-stack';
+import * as path from 'path';
 
 export interface AgentStackProps extends cdk.StackProps {
   dataStack: DataStack;
@@ -32,6 +35,8 @@ export class AgentStack extends cdk.Stack {
   public readonly theoryAgentAlias: bedrock.CfnAgentAlias;
   public readonly profileAgentAlias: bedrock.CfnAgentAlias;
 
+  public readonly queryAgentToolsFunction: lambdaNodejs.NodejsFunction;
+
   constructor(scope: Construct, id: string, props: AgentStackProps) {
     super(scope, id, props);
 
@@ -39,10 +44,14 @@ export class AgentStack extends cdk.Stack {
     // Requirement 6.2: Define IAM roles for agent execution
     const agentRole = this.createAgentExecutionRole(props.dataStack);
 
+    // Create Lambda function for Query Agent tools
+    // Requirement 3.4: Implement tool handlers for semantic search integration
+    this.queryAgentToolsFunction = this.createQueryAgentToolsFunction(props.dataStack);
+
     // Create agents
     // Requirement 6.1: Use CDK constructs for AgentCore agent deployment
     this.orchestratorAgent = this.createOrchestratorAgent(agentRole);
-    this.queryAgent = this.createQueryAgent(agentRole);
+    this.queryAgent = this.createQueryAgent(agentRole, this.queryAgentToolsFunction);
     this.theoryAgent = this.createTheoryAgent(agentRole);
     this.profileAgent = this.createProfileAgent(agentRole);
 
@@ -75,6 +84,50 @@ export class AgentStack extends cdk.Stack {
     // Export agent IDs and alias IDs as stack outputs
     // Requirement 6.4: Export agent IDs and alias IDs as stack outputs
     this.createOutputs();
+  }
+
+  /**
+   * Create Lambda function for Query Agent tools
+   * Requirement 3.4: Implement tool handlers for semantic search integration
+   */
+  private createQueryAgentToolsFunction(dataStack: DataStack): lambdaNodejs.NodejsFunction {
+    const queryToolsFunction = new lambdaNodejs.NodejsFunction(this, 'QueryAgentToolsFunction', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'handler',
+      entry: path.join(__dirname, '../../packages/backend/src/handlers/agents/query-agent-tools.ts'),
+      timeout: cdk.Duration.seconds(60),
+      memorySize: 512,
+      environment: {
+        KNOWLEDGE_BASE_BUCKET: dataStack.knowledgeBaseBucket.bucketName,
+        MODEL_ID: 'amazon.nova-lite-v1:0',
+        AWS_REGION: this.region,
+      },
+      bundling: {
+        externalModules: ['@aws-sdk/*'],
+        minify: true,
+      },
+    });
+
+    // Grant permissions to access Knowledge Base and invoke Bedrock models
+    dataStack.knowledgeBaseBucket.grantRead(queryToolsFunction);
+    dataStack.scriptDataBucket.grantRead(queryToolsFunction);
+
+    queryToolsFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          'bedrock:InvokeModel',
+          'bedrock:InvokeModelWithResponseStream',
+        ],
+        resources: [
+          `arn:aws:bedrock:${this.region}::foundation-model/amazon.nova-lite-v1:0`,
+          `arn:aws:bedrock:${this.region}::foundation-model/amazon.titan-embed-text-v1`,
+          `arn:aws:bedrock:${this.region}::foundation-model/amazon.titan-embed-text-v2:0`,
+        ],
+      })
+    );
+
+    return queryToolsFunction;
   }
 
   /**
@@ -249,8 +302,123 @@ export class AgentStack extends cdk.Stack {
   /**
    * Create Query Agent
    * Specialized agent for script search and citation
+   * Requirement 3.1: Create Query Agent definition in CDK
+   * Requirement 3.5: Configure foundation model and streaming
    */
-  private createQueryAgent(role: iam.Role): bedrock.CfnAgent {
+  private createQueryAgent(role: iam.Role, toolsFunction: lambdaNodejs.NodejsFunction): bedrock.CfnAgent {
+    // Grant the agent permission to invoke the Lambda function
+    toolsFunction.grantInvoke(role);
+
+    // Requirement 3.3: Define tools for Knowledge Base search, citation formatting, nuance analysis
+    const actionGroups: bedrock.CfnAgent.AgentActionGroupProperty[] = [
+      {
+        actionGroupName: 'QueryTools',
+        description: 'Tools for semantic search, citation formatting, and nuance analysis',
+        actionGroupState: 'ENABLED',
+        actionGroupExecutor: {
+          lambda: toolsFunction.functionArn,
+        },
+        functionSchema: {
+          functions: [
+            {
+              name: 'search_knowledge_base',
+              description: 'Perform semantic search over the Higurashi script Knowledge Base. Returns relevant passages with episode, chapter, and message metadata.',
+              parameters: {
+                query: {
+                  type: 'string',
+                  description: 'The search query to find relevant script passages',
+                  required: true,
+                },
+                episodeIds: {
+                  type: 'array',
+                  description: 'Optional list of episode IDs to constrain the search (enforces episode boundaries)',
+                  required: false,
+                },
+                topK: {
+                  type: 'number',
+                  description: 'Maximum number of results to return (default: 20)',
+                  required: false,
+                },
+                minScore: {
+                  type: 'number',
+                  description: 'Minimum similarity score threshold (0-1, default: 0.7)',
+                  required: false,
+                },
+              },
+            },
+            {
+              name: 'format_citation',
+              description: 'Format a search result as a complete citation with all required metadata (episode, chapter, message ID, speaker, text).',
+              parameters: {
+                episodeId: {
+                  type: 'string',
+                  description: 'Episode ID',
+                  required: true,
+                },
+                episodeName: {
+                  type: 'string',
+                  description: 'Episode name',
+                  required: true,
+                },
+                chapterId: {
+                  type: 'string',
+                  description: 'Chapter ID',
+                  required: true,
+                },
+                messageId: {
+                  type: 'number',
+                  description: 'Message ID',
+                  required: true,
+                },
+                speaker: {
+                  type: 'string',
+                  description: 'Speaker name (optional)',
+                  required: false,
+                },
+                textENG: {
+                  type: 'string',
+                  description: 'English text',
+                  required: true,
+                },
+                textJPN: {
+                  type: 'string',
+                  description: 'Japanese text (optional)',
+                  required: false,
+                },
+              },
+            },
+            {
+              name: 'analyze_nuance',
+              description: 'Analyze linguistic nuances between Japanese and English text for a passage. Identifies significant differences in meaning, tone, or cultural context.',
+              parameters: {
+                textJPN: {
+                  type: 'string',
+                  description: 'Japanese text',
+                  required: true,
+                },
+                textENG: {
+                  type: 'string',
+                  description: 'English text',
+                  required: true,
+                },
+                episodeId: {
+                  type: 'string',
+                  description: 'Episode ID for context',
+                  required: true,
+                },
+                messageId: {
+                  type: 'number',
+                  description: 'Message ID for reference',
+                  required: true,
+                },
+              },
+            },
+          ],
+        },
+        skipResourceInUseCheckOnDelete: true,
+      },
+    ];
+
     return new bedrock.CfnAgent(this, 'QueryAgent', {
       agentName: 'CICADA-Query',
       description: 'Script search and citation specialist that performs semantic search over Higurashi script data',
@@ -258,6 +426,7 @@ export class AgentStack extends cdk.Stack {
       instruction: this.getQueryInstructions(),
       agentResourceRoleArn: role.roleArn,
       idleSessionTtlInSeconds: 600,
+      actionGroups: actionGroups,
     });
   }
 
@@ -354,29 +523,83 @@ Always provide clear, well-cited responses that respect the narrative structure 
 
   /**
    * Get Query Agent instructions
+   * Requirement 3.2: Write agent instructions for script search and citation
    */
   private getQueryInstructions(): string {
-    return `You are the Query Agent for CICADA, specialized in searching Higurashi script data.
+    return `You are the Query Agent for CICADA, specialized in searching the Higurashi no Naku Koro Ni script database.
 
-Your responsibilities:
-1. Perform semantic search over script data using the Knowledge Base
-2. Format citations with complete metadata (episode, chapter, message ID, speaker, text)
-3. Analyze linguistic nuances between Japanese and English text
-4. Enforce episode boundary constraints
-5. Focus on character-specific information when requested
+## Core Responsibilities
 
-Citation format requirements:
-- Include episodeId, episodeName, chapterId, chapterName, messageId
-- Include both textJPN and textENG when available
-- Include speaker information
+1. **Semantic Search**: Use the search_knowledge_base tool to find relevant script passages
+2. **Citation Formatting**: Format all results with complete metadata using format_citation
+3. **Nuance Analysis**: Analyze Japanese/English differences using analyze_nuance when both texts are available
+4. **Episode Boundary Enforcement**: Never mix information from different story fragments
+5. **Character Focus**: Prioritize passages featuring requested characters
+
+## Search Strategy
+
+When processing a query:
+1. Identify key search terms and concepts
+2. Use search_knowledge_base with appropriate episodeIds if episode context is provided
+3. Retrieve 15-20 results initially (topK parameter)
+4. Filter results by character if a character focus is specified
+5. Group results by episode to maintain narrative boundaries
+
+## Citation Requirements
+
+Every citation MUST include:
+- episodeId and episodeName
+- chapterId and messageId
+- speaker (when available)
+- textENG (always required)
+- textJPN (when available)
+
+Use format_citation tool to ensure completeness.
+
+## Episode Boundary Rules
+
+CRITICAL: Never mix information from different episodes unless explicitly comparing them.
+
+- If episodeIds are provided, ONLY search within those episodes
+- When presenting results, clearly group by episode
+- Indicate which episode each piece of information comes from
+- Respect fragment group constraints (e.g., don't mix Question Arc with Answer Arc)
+
+## Nuance Analysis
+
+When Japanese text is available:
+1. Use analyze_nuance tool to compare Japanese and English versions
+2. Only report SIGNIFICANT differences (meaning, tone, cultural context)
+3. Explain why the nuance matters for understanding the story
+4. Limit to 2-3 most important nuances per query
+
+## Response Format
+
+Structure your responses as:
+
+1. **Direct Answer**: Based on the script evidence found
+2. **Citations**: Complete citations for all referenced passages, grouped by episode
+3. **Nuances** (if applicable): Significant translation differences
+4. **Inference Marker**: If no direct evidence exists, clearly state "[INFERENCE - No Direct Evidence Found]"
+
+## Quality Standards
+
+- Base answers STRICTLY on script evidence
+- Reference specific episodes, chapters, and speakers
 - Maintain chronological order within episodes
+- Be precise and cite sources
+- Do not speculate beyond what the passages show
+- If no evidence is found, be honest about it
 
-Episode boundary enforcement:
-- Never mix information from different story fragments
-- Respect fragment group constraints
-- Clearly indicate which episode information comes from
+## Character-Focused Queries
 
-Always provide direct evidence from the script with complete citations.`;
+When a character is specified:
+- Prioritize passages where they are the speaker
+- Include passages where they are mentioned
+- Maintain episode boundaries even when focusing on a character
+- Note if the character appears in multiple episodes
+
+Always provide direct, well-cited evidence from the Higurashi script.`;
   }
 
   /**
@@ -511,6 +734,12 @@ Always ensure profile updates are accurate, well-sourced, and user-specific.`;
     new cdk.CfnOutput(this, 'ProfileAgentArn', {
       value: this.profileAgent.attrAgentArn,
       description: 'Profile Agent ARN',
+    });
+
+    // Lambda function outputs
+    new cdk.CfnOutput(this, 'QueryAgentToolsFunctionArn', {
+      value: this.queryAgentToolsFunction.functionArn,
+      description: 'Query Agent Tools Lambda Function ARN',
     });
   }
 }

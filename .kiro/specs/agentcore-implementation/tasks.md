@@ -41,7 +41,7 @@
   - **Property 2: Streaming Completeness**
   - **Validates: Requirements 8.1, 8.2**
 
-- [ ] 5. Implement Query Agent with AgentCore
+- [x] 5. Implement Query Agent with AgentCore
   - Create Query Agent definition in CDK
   - Write agent instructions for script search and citation
   - Define tools for Knowledge Base search, citation formatting, nuance analysis
@@ -49,7 +49,7 @@
   - Configure foundation model and streaming
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 5.1 Write property test for citation preservation
+- [x] 5.1 Write property test for citation preservation
   - **Property 4: Citation Preservation**
   - **Validates: Requirements 3.4, 9.3**
 
