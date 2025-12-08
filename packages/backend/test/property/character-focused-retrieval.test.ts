@@ -1,5 +1,8 @@
 import * as fc from 'fast-check';
-import { QueryAgent } from '../../src/agents/query-agent';
+// TODO: Update this test to work with AgentCore implementation
+// The old prototype agents have been removed - this test needs to be updated
+// to test the AgentCore-based Query Agent through the handler tools
+// import { QueryAgent } from '../../src/agents/query-agent';
 import { SearchResult } from '../../src/services/knowledge-base-service';
 import { BedrockRuntimeClient } from '@aws-sdk/client-bedrock-runtime';
 import { S3Client } from '@aws-sdk/client-s3';

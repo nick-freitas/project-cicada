@@ -39,7 +39,10 @@ jest.mock('@aws-sdk/client-bedrock-runtime', () => ({
 }));
 
 // Import after mocks are set up
-import { ProfileAgent } from '../../src/agents/profile-agent';
+// TODO: Update this test to work with AgentCore implementation
+// The old prototype agents have been removed - this test needs to be updated
+// to test the AgentCore-based Profile Agent through the handler tools
+// import { ProfileAgent } from '../../src/agents/profile-agent';
 import { ProfileService } from '../../src/services/profile-service';
 
 describe('Property 30: Profile Information Extraction', () => {

@@ -17,6 +17,8 @@
     "eval:theory": "ts-node src/evaluation/scripts/run-eval.ts theory-coherence.json",
     "eval:story": "ts-node src/evaluation/scripts/run-eval.ts story-coherence.json",
     "eval:general": "ts-node src/evaluation/scripts/run-eval.ts general-correctness.json",
+    "perf": "ts-node src/scripts/performance-test.ts",
+    "optimize": "ts-node src/scripts/optimize-agent-instructions.ts",
     "clean": "rm -rf dist"
   },
   "dependencies": {

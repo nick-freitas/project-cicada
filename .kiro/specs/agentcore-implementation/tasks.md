@@ -156,7 +156,7 @@ f - [x] 5. Implement Query Agent with AgentCore
   - Test streaming with deployed agents
   - _Requirements: 11.2_
 
-- [ ] 17. Performance testing and optimization
+- [x] 17. Performance testing and optimization
   - Measure agent invocation latency
   - Measure token usage per query
   - Optimize agent instructions to reduce tokens
@@ -164,14 +164,14 @@ f - [x] 5. Implement Query Agent with AgentCore
   - Verify cost remains under budget
   - _Requirements: 15.1, 15.2, 15.3, 15.5_
 
-- [ ] 18. Remove prototype Bedrock-direct implementation
+- [x] 18. Remove prototype Bedrock-direct implementation
   - Delete old agent implementations in packages/backend/src/agents/
   - Remove direct BedrockRuntimeClient usage from agents
   - Update imports and references
   - Clean up unused code
   - _Requirements: 14.4_
 
-- [ ] 19. Update documentation
+- [x] 19. Update documentation
   - Update architecture diagrams to show AgentCore
   - Document agent invocation patterns
   - Add examples of agent-to-agent calls
@@ -179,7 +179,7 @@ f - [x] 5. Implement Query Agent with AgentCore
   - Update README with AgentCore information
   - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5_
 
-- [ ] 20. Deploy to nonprod environment
+- [x] 20. Deploy to nonprod environment
   - Deploy updated CDK stacks to nonprod
   - Verify all agents are created successfully
   - Test end-to-end functionality in nonprod

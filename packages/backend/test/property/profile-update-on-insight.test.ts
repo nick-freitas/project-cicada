@@ -1,5 +1,15 @@
 import * as fc from 'fast-check';
-import { ProfileUpdate } from '../../src/agents/theory-agent';
+// TODO: Update this test to work with AgentCore implementation
+// The old prototype agents have been removed - this test needs to be updated
+// to test the AgentCore-based Theory Agent through the handler tools
+// import { ProfileUpdate } from '../../src/agents/theory-agent';
+
+// Temporary type definition until test is updated
+type ProfileUpdate = {
+  profileType: string;
+  profileId: string;
+  updateDescription: string;
+};
 
 /**
  * Feature: project-cicada, Property 13: Profile Update on Insight

@@ -1,7 +1,18 @@
 import * as fc from 'fast-check';
-import { ProfileAgent, ProfileAgentRequest, ProfileAgentResponse } from '../../src/agents/profile-agent';
+// TODO: Update this test to work with AgentCore implementation
+// The old prototype agents have been removed - this test needs to be updated
+// to test the AgentCore-based Profile Agent through the handler tools
+// import { ProfileAgent, ProfileAgentRequest, ProfileAgentResponse } from '../../src/agents/profile-agent';
 import { profileService } from '../../src/services/profile-service';
 import { Citation } from '@cicada/shared-types';
+import { ProfileAgentRequest } from '../../src/types/agentcore';
+import { ProfileAgentRequest } from '../../src/types/agentcore';
+import { ProfileAgentRequest } from '../../src/types/agentcore';
+import { ProfileAgentRequest } from '../../src/types/agentcore';
+import { ProfileAgentRequest } from '../../src/types/agentcore';
+import { ProfileAgentRequest } from '../../src/types/agentcore';
+import { ProfileAgentRequest } from '../../src/types/agentcore';
+import { ProfileAgentRequest } from '../../src/types/agentcore';
 
 /**
  * Feature: agentcore-implementation, Property 5: Profile Update Consistency

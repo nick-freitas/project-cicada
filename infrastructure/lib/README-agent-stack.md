@@ -229,7 +229,18 @@ If deployment fails:
 
 ## References
 
+### Documentation
+- [AgentCore Architecture](../../packages/backend/docs/AGENTCORE_ARCHITECTURE.md) - Complete architecture guide
+- [Agent Invocation Examples](../../packages/backend/docs/AGENT_INVOCATION_EXAMPLES.md) - Practical code examples
+- [Streaming Implementation](../../packages/backend/docs/STREAMING_IMPLEMENTATION.md) - Streaming guide
+- [Quick Reference](../../packages/backend/docs/AGENTCORE_QUICK_REFERENCE.md) - Quick reference guide
+- [Architecture Diagrams](../../docs/ARCHITECTURE_DIAGRAMS.md) - Visual diagrams
+
+### Specification
+- [AgentCore Implementation Design](../../.kiro/specs/agentcore-implementation/design.md)
+- [AgentCore Implementation Requirements](../../.kiro/specs/agentcore-implementation/requirements.md)
+- [AgentCore Implementation Tasks](../../.kiro/specs/agentcore-implementation/tasks.md)
+
+### AWS Documentation
 - [AWS Bedrock Agents Documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/agents.html)
-- [AgentCore Implementation Design](.kiro/specs/agentcore-implementation/design.md)
-- [AgentCore Implementation Requirements](.kiro/specs/agentcore-implementation/requirements.md)
-- [AgentCore Implementation Tasks](.kiro/specs/agentcore-implementation/tasks.md)
+- [AWS SDK for JavaScript v3 - Bedrock Agent Runtime](https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/bedrock-agent-runtime/)

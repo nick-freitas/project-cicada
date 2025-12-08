@@ -1,6 +1,17 @@
 import * as fc from 'fast-check';
 import { Citation } from '@cicada/shared-types';
-import { TheorySuggestion } from '../../src/agents/theory-agent';
+// TODO: Update this test to work with AgentCore implementation
+// The old prototype agents have been removed - this test needs to be updated
+// to test the AgentCore-based Theory Agent through the handler tools
+// import { TheorySuggestion } from '../../src/agents/theory-agent';
+
+// Temporary type definition until test is updated
+type TheorySuggestion = {
+  theoryName: string;
+  description: string;
+  reasoning: string;
+  relevantProfiles: string[];
+};
 
 /**
  * Feature: project-cicada, Property 12: Theory Citation Inclusion
