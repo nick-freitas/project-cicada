@@ -372,7 +372,7 @@ dsass
   - Run evaluations
   - _Requirements: 26.1-26.5_
 
-- [ ] 27. Implement model selection and experimentation
+- [x] 27. Implement model selection and experimentation
   - Configure Nova model support
   - Configure Maverick model support
   - Implement model switching logic
