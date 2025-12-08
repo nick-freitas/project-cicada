@@ -358,7 +358,7 @@ dsass
   - Test migration with sample data
   - _Requirements: 20.1, 20.2, 20.3, 20.4, 20.5_
 
-- [ ] 26. Set up model evaluation with AWS Evals
+- [x] 26. Set up model evaluation with AWS Evals
   - Configure AWS Evals
   - Create evaluation datasets
   - Implement citation accuracy metrics
@@ -367,7 +367,7 @@ dsass
   - Implement overall correctness metrics
   - _Requirements: 26.1, 26.2, 26.3, 26.4, 26.5_
 
-- [ ] 26.1 Write evaluation test suite
+- [x] 26.1 Write evaluation test suite
   - Create test cases for each metric
   - Run evaluations
   - _Requirements: 26.1-26.5_

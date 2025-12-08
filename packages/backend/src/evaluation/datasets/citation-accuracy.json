@@ -1,0 +1,57 @@
+[
+  {
+    "id": "cite-001",
+    "query": "What does Rena say about Keiichi in the first chapter?",
+    "context": {
+      "userId": "test-user",
+      "episodeScope": ["onikakushi"]
+    },
+    "expectedBehavior": {
+      "shouldCite": true,
+      "citationCount": 1,
+      "episodeReferences": ["onikakushi"],
+      "shouldMentionCharacters": ["Rena", "Keiichi"]
+    },
+    "metadata": {
+      "category": "citation",
+      "difficulty": "easy",
+      "description": "Simple query requiring direct citation from specific episode"
+    }
+  },
+  {
+    "id": "cite-002",
+    "query": "How does Mion's behavior differ between Onikakushi and Watanagashi?",
+    "context": {
+      "userId": "test-user",
+      "episodeScope": ["onikakushi", "watanagashi"]
+    },
+    "expectedBehavior": {
+      "shouldCite": true,
+      "citationCount": 2,
+      "episodeReferences": ["onikakushi", "watanagashi"],
+      "shouldMentionCharacters": ["Mion"]
+    },
+    "metadata": {
+      "category": "citation",
+      "difficulty": "medium",
+      "description": "Comparison query requiring citations from multiple episodes"
+    }
+  },
+  {
+    "id": "cite-003",
+    "query": "What is the significance of the dam project?",
+    "context": {
+      "userId": "test-user"
+    },
+    "expectedBehavior": {
+      "shouldCite": true,
+      "citationCount": 3,
+      "shouldMentionCharacters": []
+    },
+    "metadata": {
+      "category": "citation",
+      "difficulty": "hard",
+      "description": "Thematic query requiring synthesis across multiple episodes"
+    }
+  }
+]

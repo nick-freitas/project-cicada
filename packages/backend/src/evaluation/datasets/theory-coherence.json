@@ -1,0 +1,38 @@
+[
+  {
+    "id": "theory-001",
+    "query": "I think Mion and Shion might be switching places. What evidence supports this?",
+    "context": {
+      "userId": "test-user",
+      "episodeScope": ["watanagashi"]
+    },
+    "expectedBehavior": {
+      "shouldCite": true,
+      "citationCount": 2,
+      "episodeReferences": ["watanagashi"],
+      "shouldMentionCharacters": ["Mion", "Shion"]
+    },
+    "metadata": {
+      "category": "theory",
+      "difficulty": "medium",
+      "description": "Theory analysis requiring evidence gathering"
+    }
+  },
+  {
+    "id": "theory-002",
+    "query": "Could Oyashiro-sama's curse be related to the dam project murders?",
+    "context": {
+      "userId": "test-user"
+    },
+    "expectedBehavior": {
+      "shouldCite": true,
+      "citationCount": 3,
+      "shouldAvoidSpoilers": true
+    },
+    "metadata": {
+      "category": "theory",
+      "difficulty": "hard",
+      "description": "Complex theory requiring careful spoiler management"
+    }
+  }
+]

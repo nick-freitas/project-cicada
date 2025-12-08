@@ -1,0 +1,39 @@
+[
+  {
+    "id": "story-001",
+    "query": "Tell me about Rena's character",
+    "context": {
+      "userId": "test-user",
+      "episodeScope": ["onikakushi"]
+    },
+    "expectedBehavior": {
+      "shouldCite": true,
+      "episodeReferences": ["onikakushi"],
+      "shouldMentionCharacters": ["Rena"],
+      "shouldAvoidSpoilers": true
+    },
+    "metadata": {
+      "category": "story",
+      "difficulty": "easy",
+      "description": "Character description respecting episode boundaries"
+    }
+  },
+  {
+    "id": "story-002",
+    "query": "What happens during the Cotton Drifting Festival?",
+    "context": {
+      "userId": "test-user",
+      "episodeScope": ["watanagashi"]
+    },
+    "expectedBehavior": {
+      "shouldCite": true,
+      "episodeReferences": ["watanagashi"],
+      "shouldAvoidSpoilers": true
+    },
+    "metadata": {
+      "category": "story",
+      "difficulty": "medium",
+      "description": "Event description with spoiler awareness"
+    }
+  }
+]

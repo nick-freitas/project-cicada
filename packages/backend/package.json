@@ -12,6 +12,11 @@
     "test:integration": "jest --testPathPattern=test/integration",
     "test:property": "jest --testPathPattern=test/property",
     "migrate": "ts-node src/scripts/run-migration.ts",
+    "eval": "ts-node src/evaluation/scripts/run-eval.ts",
+    "eval:citations": "ts-node src/evaluation/scripts/run-eval.ts citation-accuracy.json",
+    "eval:theory": "ts-node src/evaluation/scripts/run-eval.ts theory-coherence.json",
+    "eval:story": "ts-node src/evaluation/scripts/run-eval.ts story-coherence.json",
+    "eval:general": "ts-node src/evaluation/scripts/run-eval.ts general-correctness.json",
     "clean": "rm -rf dist"
   },
   "dependencies": {
@@ -38,6 +43,7 @@
     "fast-check": "^3.0.0",
     "jest": "^29.0.0",
     "ts-jest": "^29.0.0",
+    "ts-node": "^10.9.2",
     "typescript": "^5.0.0"
   }
 }

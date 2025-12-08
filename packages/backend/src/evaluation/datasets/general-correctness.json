@@ -1,0 +1,33 @@
+[
+  {
+    "id": "general-001",
+    "query": "Who are the main characters in Higurashi?",
+    "context": {
+      "userId": "test-user"
+    },
+    "expectedBehavior": {
+      "shouldCite": false,
+      "shouldMentionCharacters": ["Keiichi", "Rena", "Mion", "Satoko", "Rika"]
+    },
+    "metadata": {
+      "category": "general",
+      "difficulty": "easy",
+      "description": "General knowledge query not requiring citations"
+    }
+  },
+  {
+    "id": "general-002",
+    "query": "What is the setting of Higurashi?",
+    "context": {
+      "userId": "test-user"
+    },
+    "expectedBehavior": {
+      "shouldCite": false
+    },
+    "metadata": {
+      "category": "general",
+      "difficulty": "easy",
+      "description": "Setting description"
+    }
+  }
+]
