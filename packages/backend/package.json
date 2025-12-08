@@ -11,6 +11,7 @@
     "test:unit": "jest --testPathPattern=test/unit",
     "test:integration": "jest --testPathPattern=test/integration",
     "test:property": "jest --testPathPattern=test/property",
+    "migrate": "ts-node src/scripts/run-migration.ts",
     "clean": "rm -rf dist"
   },
   "dependencies": {
