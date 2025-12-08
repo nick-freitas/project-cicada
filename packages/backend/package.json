@@ -24,10 +24,10 @@
   "dependencies": {
     "@aws-sdk/client-bedrock-agent": "^3.943.0",
     "@aws-sdk/client-bedrock-agent-runtime": "^3.943.0",
-    "@aws-sdk/client-bedrock-runtime": "^3.0.0",
-    "@aws-sdk/client-dynamodb": "^3.0.0",
-    "@aws-sdk/client-s3": "^3.0.0",
-    "@aws-sdk/lib-dynamodb": "^3.0.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.943.0",
+    "@aws-sdk/client-dynamodb": "^3.943.0",
+    "@aws-sdk/client-s3": "^3.943.0",
+    "@aws-sdk/lib-dynamodb": "^3.943.0",
     "@cicada/shared-types": "workspace:*",
     "aws-jwt-verify": "^4.0.0",
     "uuid": "^9.0.1"

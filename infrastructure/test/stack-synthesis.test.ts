@@ -1,5 +1,6 @@
 import * as cdk from 'aws-cdk-lib';
 import { DataStack } from '../lib/data-stack';
+import { AgentStack } from '../lib/agent-stack';
 import { APIStack } from '../lib/api-stack';
 import { AuthStack } from '../lib/auth-stack';
 import { FrontendStack } from '../lib/frontend-stack';
@@ -19,7 +20,8 @@ describe('CDK Stack Synthesis', () => {
 
   test('APIStack synthesizes without errors', () => {
     const dataStack = new DataStack(app, 'TestDataStack');
-    const stack = new APIStack(app, 'TestAPIStack', { dataStack });
+    const agentStack = new AgentStack(app, 'TestAgentStack', { dataStack });
+    const stack = new APIStack(app, 'TestAPIStack', { dataStack, agentStack });
     expect(() => app.synth()).not.toThrow();
   });
 
@@ -30,7 +32,8 @@ describe('CDK Stack Synthesis', () => {
 
   test('FrontendStack synthesizes without errors', () => {
     const dataStack = new DataStack(app, 'TestDataStack');
-    const apiStack = new APIStack(app, 'TestAPIStack', { dataStack });
+    const agentStack = new AgentStack(app, 'TestAgentStack', { dataStack });
+    const apiStack = new APIStack(app, 'TestAPIStack', { dataStack, agentStack });
     const authStack = new AuthStack(app, 'TestAuthStack');
     const stack = new FrontendStack(app, 'TestFrontendStack', { apiStack, authStack });
     expect(() => app.synth()).not.toThrow();
@@ -38,7 +41,8 @@ describe('CDK Stack Synthesis', () => {
 
   test('MonitoringStack synthesizes without errors', () => {
     const dataStack = new DataStack(app, 'TestDataStack');
-    const apiStack = new APIStack(app, 'TestAPIStack', { dataStack });
+    const agentStack = new AgentStack(app, 'TestAgentStack', { dataStack });
+    const apiStack = new APIStack(app, 'TestAPIStack', { dataStack, agentStack });
     const stack = new MonitoringStack(app, 'TestMonitoringStack', {
       dataStack,
       apiStack,
@@ -48,8 +52,9 @@ describe('CDK Stack Synthesis', () => {
 
   test('all stacks synthesize together without errors', () => {
     const dataStack = new DataStack(app, 'TestDataStack');
+    const agentStack = new AgentStack(app, 'TestAgentStack', { dataStack });
     const authStack = new AuthStack(app, 'TestAuthStack');
-    const apiStack = new APIStack(app, 'TestAPIStack', { dataStack, authStack });
+    const apiStack = new APIStack(app, 'TestAPIStack', { dataStack, agentStack, authStack });
     const frontendStack = new FrontendStack(app, 'TestFrontendStack', { apiStack, authStack });
     const monitoringStack = new MonitoringStack(app, 'TestMonitoringStack', {
       dataStack,

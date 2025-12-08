@@ -17,11 +17,12 @@
     "inlineSources": true,
     "experimentalDecorators": true,
     "strictPropertyInitialization": false,
+    "types": ["jest", "node"],
     "typeRoots": ["../node_modules/@types", "./node_modules/@types"],
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true
   },
-  "exclude": ["node_modules", "cdk.out", "test"]
+  "exclude": ["node_modules", "cdk.out"]
 }
