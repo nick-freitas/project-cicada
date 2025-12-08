@@ -9,7 +9,7 @@
   - Update TypeScript types and configurations
   - _Requirements: 1.1, 1.2_
 
-- [ ] 2. Create CDK Agent Stack infrastructure
+- [x] 2. Create CDK Agent Stack infrastructure
   - Create infrastructure/lib/agent-stack.ts
   - Define IAM roles for agent execution
   - Configure permissions for DynamoDB, S3, Knowledge Base access
@@ -17,7 +17,7 @@
   - Export agent IDs and alias IDs as stack outputs
   - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
-- [ ] 3. Implement Orchestrator Agent with AgentCore
+- [x] 3. Implement Orchestrator Agent with AgentCore
   - Create agent definition using CDK CfnAgent construct
   - Write agent instructions for query intent analysis
   - Define tools for invoking Query, Theory, and Profile agents
@@ -25,7 +25,7 @@
   - Deploy agent and verify it can be invoked
   - _Requirements: 2.1, 2.2, 2.5_
 
-- [ ]* 3.1 Write property test for agent invocation consistency
+- [x] 3.1 Write property test for agent invocation consistency
   - **Property 1: Agent Invocation Consistency**
   - **Validates: Requirements 9.1, 9.2**
 
@@ -37,7 +37,7 @@
   - Maintain existing WebSocket message format
   - _Requirements: 7.1, 7.4, 8.1_
 
-- [ ]* 4.1 Write property test for streaming completeness
+- [ ] 4.1 Write property test for streaming completeness
   - **Property 2: Streaming Completeness**
   - **Validates: Requirements 8.1, 8.2**
 
@@ -49,7 +49,7 @@
   - Configure foundation model and streaming
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ]* 5.1 Write property test for citation preservation
+- [ ] 5.1 Write property test for citation preservation
   - **Property 4: Citation Preservation**
   - **Validates: Requirements 3.4, 9.3**
 
@@ -60,7 +60,7 @@
   - Test agent-to-agent invocation
   - _Requirements: 2.3, 7.2_
 
-- [ ]* 6.1 Write property test for agent coordination correctness
+- [ ] 6.1 Write property test for agent coordination correctness
   - **Property 3: Agent Coordination Correctness**
   - **Validates: Requirements 2.2, 2.3**
 
@@ -88,7 +88,7 @@
   - Configure foundation model (streaming disabled for transactional operations)
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
 
-- [ ]* 9.1 Write property test for profile update consistency
+- [ ] 9.1 Write property test for profile update consistency
   - **Property 5: Profile Update Consistency**
   - **Validates: Requirements 5.3, 5.4, 9.4**
 
@@ -107,7 +107,7 @@
   - Add comprehensive error logging
   - _Requirements: 7.3_
 
-- [ ]* 11.1 Write property test for error recovery
+- [ ] 11.1 Write property test for error recovery
   - **Property 6: Error Recovery**
   - **Validates: Requirements 7.3**
 
