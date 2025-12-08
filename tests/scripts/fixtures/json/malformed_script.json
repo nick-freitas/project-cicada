@@ -1,0 +1,11 @@
+{
+  "episode": "tatarigoroshi",
+  "chapter": "03",
+  "messages": [
+    {
+      "speaker": "Satoko",
+      "japanese": "にぱー！",
+      "english": "Nipah!"
+    }
+  ]
+  // Missing closing brace - intentionally malformed for testing

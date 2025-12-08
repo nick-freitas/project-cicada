@@ -1,0 +1,11 @@
+{
+  "logGroups": [
+    {
+      "logGroupName": "/aws/lambda/ProjectCICADADataStack-ScriptIngestionHandler-abc123",
+      "creationTime": 1700000000000,
+      "metricFilterCount": 0,
+      "arn": "arn:aws:logs:us-east-1:123456789012:log-group:/aws/lambda/ProjectCICADADataStack-ScriptIngestionHandler-abc123",
+      "storedBytes": 1024
+    }
+  ]
+}

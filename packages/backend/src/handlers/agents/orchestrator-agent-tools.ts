@@ -228,8 +228,12 @@ export async function invokeTheoryAgent(
   } catch (error) {
     // Requirement 7.3: Add comprehensive error logging
     // Property 6: Error Recovery - graceful error handling
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    
     logger.error('Error invoking Theory Agent', {
-      error: error instanceof Error ? error.message : 'Unknown error',
+      errorMessage,
+      errorStack,
       errorType: error instanceof AgentInvocationError ? 'AgentInvocationError' : error?.constructor?.name,
       retryable: error instanceof AgentInvocationError ? error.retryable : false,
       input,
@@ -392,6 +396,7 @@ export async function handler(event: any): Promise<any> {
     }
 
     // Return response in the format expected by Bedrock Agents
+    // Note: Bedrock agents require TEXT content type, not JSON
     return {
       messageVersion: '1.0',
       response: {
@@ -399,8 +404,8 @@ export async function handler(event: any): Promise<any> {
         function: functionName,
         functionResponse: {
           responseBody: {
-            'application/json': {
-              body: JSON.stringify({ result }),
+            'TEXT': {
+              body: typeof result === 'string' ? result : JSON.stringify(result),
             },
           },
         },
@@ -417,7 +422,7 @@ export async function handler(event: any): Promise<any> {
         functionResponse: {
           responseState: 'FAILURE',
           responseBody: {
-            'application/json': {
+            'TEXT': {
               body: JSON.stringify({
                 error: error instanceof Error ? error.message : 'Unknown error',
               }),

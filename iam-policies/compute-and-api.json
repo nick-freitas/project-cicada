@@ -1,0 +1,166 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "LambdaFunctions",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:CreateFunction",
+        "lambda:UpdateFunctionCode",
+        "lambda:UpdateFunctionConfiguration",
+        "lambda:DeleteFunction",
+        "lambda:GetFunction",
+        "lambda:GetFunctionConfiguration",
+        "lambda:ListVersionsByFunction",
+        "lambda:PublishVersion",
+        "lambda:CreateAlias",
+        "lambda:UpdateAlias",
+        "lambda:DeleteAlias",
+        "lambda:AddPermission",
+        "lambda:RemovePermission",
+        "lambda:GetPolicy",
+        "lambda:TagResource",
+        "lambda:UntagResource",
+        "lambda:CreateEventSourceMapping",
+        "lambda:UpdateEventSourceMapping",
+        "lambda:DeleteEventSourceMapping",
+        "lambda:GetEventSourceMapping",
+        "lambda:ListFunctions",
+        "lambda:InvokeFunction"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CognitoUserPool",
+      "Effect": "Allow",
+      "Action": [
+        "cognito-idp:CreateUserPool",
+        "cognito-idp:UpdateUserPool",
+        "cognito-idp:DeleteUserPool",
+        "cognito-idp:DescribeUserPool",
+        "cognito-idp:CreateUserPoolClient",
+        "cognito-idp:UpdateUserPoolClient",
+        "cognito-idp:DeleteUserPoolClient",
+        "cognito-idp:DescribeUserPoolClient",
+        "cognito-idp:AdminCreateUser",
+        "cognito-idp:AdminDeleteUser",
+        "cognito-idp:AdminSetUserPassword",
+        "cognito-idp:AdminGetUser",
+        "cognito-idp:ListUsers",
+        "cognito-idp:TagResource",
+        "cognito-idp:UntagResource"
+      ],
+      "Resource": "arn:aws:cognito-idp:*:*:userpool/*"
+    },
+    {
+      "Sid": "CognitoListOperations",
+      "Effect": "Allow",
+      "Action": [
+        "cognito-idp:ListUserPools"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "APIGateway",
+      "Effect": "Allow",
+      "Action": [
+        "apigateway:POST",
+        "apigateway:GET",
+        "apigateway:PUT",
+        "apigateway:PATCH",
+        "apigateway:DELETE",
+        "apigateway:UpdateRestApiPolicy"
+      ],
+      "Resource": [
+        "arn:aws:apigateway:*::/restapis",
+        "arn:aws:apigateway:*::/restapis/*",
+        "arn:aws:apigateway:*::/apis",
+        "arn:aws:apigateway:*::/apis/*"
+      ]
+    },
+    {
+      "Sid": "SQSQueues",
+      "Effect": "Allow",
+      "Action": [
+        "sqs:CreateQueue",
+        "sqs:DeleteQueue",
+        "sqs:GetQueueAttributes",
+        "sqs:SetQueueAttributes",
+        "sqs:TagQueue",
+        "sqs:UntagQueue"
+      ],
+      "Resource": "arn:aws:sqs:*:*:CICADA*"
+    },
+    {
+      "Sid": "StepFunctions",
+      "Effect": "Allow",
+      "Action": [
+        "states:CreateStateMachine",
+        "states:UpdateStateMachine",
+        "states:DeleteStateMachine",
+        "states:DescribeStateMachine",
+        "states:TagResource",
+        "states:UntagResource"
+      ],
+      "Resource": "arn:aws:states:*:*:stateMachine:CICADA*"
+    },
+    {
+      "Sid": "EventBridge",
+      "Effect": "Allow",
+      "Action": [
+        "events:PutRule",
+        "events:DeleteRule",
+        "events:DescribeRule",
+        "events:PutTargets",
+        "events:RemoveTargets",
+        "events:TagResource",
+        "events:UntagResource"
+      ],
+      "Resource": "arn:aws:events:*:*:rule/CICADA*"
+    },
+    {
+      "Sid": "CloudFrontForFrontend",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:CreateDistribution",
+        "cloudfront:UpdateDistribution",
+        "cloudfront:DeleteDistribution",
+        "cloudfront:GetDistribution",
+        "cloudfront:GetDistributionConfig",
+        "cloudfront:TagResource",
+        "cloudfront:UntagResource",
+        "cloudfront:CreateCloudFrontOriginAccessIdentity",
+        "cloudfront:DeleteCloudFrontOriginAccessIdentity",
+        "cloudfront:GetCloudFrontOriginAccessIdentity",
+        "cloudfront:UpdateCloudFrontOriginAccessIdentity"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "Route53ForCustomDomain",
+      "Effect": "Allow",
+      "Action": [
+        "route53:GetHostedZone",
+        "route53:ListHostedZones",
+        "route53:ListHostedZonesByName",
+        "route53:ChangeResourceRecordSets",
+        "route53:GetChange",
+        "route53:ListResourceRecordSets"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ACMForSSLCertificates",
+      "Effect": "Allow",
+      "Action": [
+        "acm:RequestCertificate",
+        "acm:DescribeCertificate",
+        "acm:DeleteCertificate",
+        "acm:ListCertificates",
+        "acm:AddTagsToCertificate",
+        "acm:RemoveTagsFromCertificate"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

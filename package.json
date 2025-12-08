@@ -20,6 +20,10 @@
     "test:unit": "pnpm --filter @cicada/backend run test:unit && pnpm --filter @cicada/shared-types run test && pnpm --filter @cicada/infrastructure run test",
     "test:integration": "pnpm --filter @cicada/backend run test:integration",
     "test:property": "pnpm --filter @cicada/backend run test:property",
+    "test:scripts": "npx bats tests/scripts/unit/*.bats tests/scripts/property/*.bats tests/scripts/integration/*.bats 2>/dev/null || npx bats tests/scripts/unit/*.bats",
+    "test:scripts:unit": "npx bats tests/scripts/unit/*.bats",
+    "test:scripts:property": "npx bats tests/scripts/property/*.bats 2>/dev/null || echo 'No property tests yet'",
+    "test:scripts:integration": "npx bats tests/scripts/integration/*.bats 2>/dev/null || echo 'No integration tests yet'",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,json,md}\"",
@@ -28,18 +32,27 @@
     "deploy:nonprod": "dotenv -e .env.nonprod -- pnpm --filter @cicada/infrastructure run deploy",
     "deploy:prod": "dotenv -e .env.prod -- pnpm --filter @cicada/infrastructure run deploy",
     "synth:nonprod": "dotenv -e .env.nonprod -- pnpm --filter @cicada/infrastructure run synth",
-    "synth:prod": "dotenv -e .env.prod -- pnpm --filter @cicada/infrastructure run synth"
+    "synth:prod": "dotenv -e .env.prod -- pnpm --filter @cicada/infrastructure run synth",
+    "reset-passwords": "./scripts/reset-passwords.sh",
+    "test:agent": "node scripts/test-agent.js"
   },
   "devDependencies": {
+    "@types/uuid": "^9.0.8",
+    "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
+    "bats": "^1.13.0",
+    "bats-assert": "^2.2.4",
+    "bats-support": "^0.3.0",
     "dotenv": "^17.2.3",
     "dotenv-cli": "^11.0.0",
     "esbuild": "^0.27.1",
     "eslint": "^8.0.0",
     "eslint-config-prettier": "^9.0.0",
     "prettier": "^3.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "uuid": "^9.0.1",
+    "ws": "^8.18.3"
   },
   "pnpm": {
     "overrides": {

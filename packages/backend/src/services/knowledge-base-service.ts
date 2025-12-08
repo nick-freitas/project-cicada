@@ -39,6 +39,7 @@ export interface SearchOptions {
   topK?: number;
   minScore?: number;
   metadataFilters?: Record<string, any>;
+  maxEmbeddingsToLoad?: number; // Limit embeddings loaded for performance
 }
 
 /**
@@ -60,7 +61,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
     
     return responseBody.embedding;
   } catch (error) {
-    logger.error('Error generating embedding', { error, text: text.substring(0, 100) });
+    logger.error('Error generating embedding', error, { text: text.substring(0, 100) });
     throw error;
   }
 }
@@ -103,17 +104,18 @@ export async function storeEmbedding(embedding: ScriptEmbedding): Promise<void> 
     await s3Client.send(command);
     logger.info('Stored embedding', { id: embedding.id, episodeId: embedding.episodeId });
   } catch (error) {
-    logger.error('Error storing embedding', { error, id: embedding.id });
+    logger.error('Error storing embedding', error, { id: embedding.id });
     throw error;
   }
 }
 
 /**
- * Load all embeddings from S3 (with optional episode filter)
+ * Load all embeddings from S3 (with optional episode filter and limit)
  */
-async function loadEmbeddings(episodeIds?: string[]): Promise<ScriptEmbedding[]> {
+async function loadEmbeddings(episodeIds?: string[], maxToLoad?: number): Promise<ScriptEmbedding[]> {
   try {
     const embeddings: ScriptEmbedding[] = [];
+    const limit = maxToLoad || 5000; // Default limit to prevent loading too many
     
     // If episode IDs are specified, only load those episodes
     const prefixes = episodeIds 
@@ -121,40 +123,53 @@ async function loadEmbeddings(episodeIds?: string[]): Promise<ScriptEmbedding[]>
       : ['embeddings/'];
 
     for (const prefix of prefixes) {
-      const listCommand = new ListObjectsV2Command({
-        Bucket: KNOWLEDGE_BASE_BUCKET,
-        Prefix: prefix,
-      });
-
-      const listResponse = await s3Client.send(listCommand);
+      let continuationToken: string | undefined;
       
-      if (!listResponse.Contents) {
-        continue;
-      }
-
-      // Load each embedding file
-      for (const object of listResponse.Contents) {
-        if (!object.Key) continue;
-
-        const getCommand = new GetObjectCommand({
+      do {
+        const listCommand = new ListObjectsV2Command({
           Bucket: KNOWLEDGE_BASE_BUCKET,
-          Key: object.Key,
+          Prefix: prefix,
+          MaxKeys: 1000, // S3 pagination limit
+          ContinuationToken: continuationToken,
         });
 
-        const getResponse = await s3Client.send(getCommand);
-        const body = await getResponse.Body?.transformToString();
+        const listResponse = await s3Client.send(listCommand);
         
-        if (body) {
-          const embedding = JSON.parse(body) as ScriptEmbedding;
-          embeddings.push(embedding);
+        if (!listResponse.Contents) {
+          break;
         }
-      }
+
+        // Load each embedding file (up to limit)
+        for (const object of listResponse.Contents) {
+          if (embeddings.length >= limit) {
+            logger.info('Reached embedding load limit', { limit, episodeIds });
+            return embeddings;
+          }
+
+          if (!object.Key) continue;
+
+          const getCommand = new GetObjectCommand({
+            Bucket: KNOWLEDGE_BASE_BUCKET,
+            Key: object.Key,
+          });
+
+          const getResponse = await s3Client.send(getCommand);
+          const body = await getResponse.Body?.transformToString();
+          
+          if (body) {
+            const embedding = JSON.parse(body) as ScriptEmbedding;
+            embeddings.push(embedding);
+          }
+        }
+
+        continuationToken = listResponse.NextContinuationToken;
+      } while (continuationToken && embeddings.length < limit);
     }
 
-    logger.info('Loaded embeddings', { count: embeddings.length, episodeIds });
+    logger.info('Loaded embeddings', { count: embeddings.length, episodeIds, limit });
     return embeddings;
   } catch (error) {
-    logger.error('Error loading embeddings', { error, episodeIds });
+    logger.error('Error loading embeddings', error, { episodeIds });
     throw error;
   }
 }
@@ -192,15 +207,16 @@ export async function semanticSearch(
     const {
       episodeIds,
       topK = 10,
-      minScore = 0.7,
+      minScore = 0.5, // Lowered from 0.7 to 0.5 for better recall
       metadataFilters,
+      maxEmbeddingsToLoad = 3000, // Limit for performance - balance between coverage and speed
     } = options;
 
     // Generate query embedding
     const queryEmbedding = await generateEmbedding(query);
 
     // Load embeddings (filtered by episode if specified)
-    let embeddings = await loadEmbeddings(episodeIds);
+    let embeddings = await loadEmbeddings(episodeIds, maxEmbeddingsToLoad);
 
     // Apply metadata filters
     embeddings = applyMetadataFilters(embeddings, metadataFilters);
@@ -239,7 +255,7 @@ export async function semanticSearch(
 
     return searchResults;
   } catch (error) {
-    logger.error('Error in semantic search', { error, query: query.substring(0, 50) });
+    logger.error('Error in semantic search', error, { query: query.substring(0, 50) });
     throw error;
   }
 }

@@ -6,26 +6,28 @@ import { logger } from '../utils/logger';
 const s3Client = new S3Client({});
 
 /**
- * Lambda handler for S3 events
- * Triggered when new script files are uploaded to the script bucket
+ * Lambda handler for processing script files uploaded to S3
+ * Triggered by S3 ObjectCreated events
  */
 export const handler: S3Handler = async (event: S3Event): Promise<void> => {
-  logger.info('Script ingestion handler invoked', { recordCount: event.Records.length });
+  logger.info('Script ingestion handler invoked', {
+    recordCount: event.Records.length,
+  });
 
   for (const record of event.Records) {
     try {
       const bucket = record.s3.bucket.name;
       const key = decodeURIComponent(record.s3.object.key.replace(/\+/g, ' '));
 
-      logger.info('Processing S3 object', { bucket, key });
-
-      // Only process JSON files
-      if (!key.endsWith('.json')) {
-        logger.info('Skipping non-JSON file', { key });
+      // Skip processed files and non-JSON files
+      if (key.startsWith('processed/') || !key.endsWith('.json')) {
+        logger.info('Skipping file', { key, reason: 'not a raw JSON file' });
         continue;
       }
 
-      // Get the file from S3
+      logger.info('Processing script file', { bucket, key });
+
+      // Download file from S3
       const response = await s3Client.send(
         new GetObjectCommand({
           Bucket: bucket,
@@ -33,9 +35,9 @@ export const handler: S3Handler = async (event: S3Event): Promise<void> => {
         })
       );
 
-      const body = await response.Body?.transformToString();
-      if (!body) {
-        logger.warn('Empty file body', { key });
+      const fileContent = await response.Body?.transformToString();
+      if (!fileContent) {
+        logger.error('Empty file content', { bucket, key });
         continue;
       }
 
@@ -43,17 +45,19 @@ export const handler: S3Handler = async (event: S3Event): Promise<void> => {
       const filename = key.split('/').pop() || key;
 
       // Process the script file
-      await scriptIngestionService.processScriptFile(filename, body);
+      await scriptIngestionService.processScriptFile(filename, fileContent);
 
-      logger.info('Successfully processed S3 object', { bucket, key });
+      logger.info('Successfully processed script file', { bucket, key, filename });
     } catch (error) {
-      logger.error('Failed to process S3 object', {
+      logger.error('Failed to process script file', {
         error,
         record: record.s3,
       });
-      // Don't throw - continue processing other records
+      // Continue processing other files even if one fails
     }
   }
 
-  logger.info('Script ingestion handler completed');
+  logger.info('Script ingestion handler completed', {
+    recordCount: event.Records.length,
+  });
 };

@@ -403,6 +403,7 @@ export async function handler(event: any): Promise<any> {
     }
 
     // Return response in the format expected by Bedrock Agents
+    // Note: Bedrock agents require TEXT content type, not JSON
     return {
       messageVersion: '1.0',
       response: {
@@ -410,8 +411,8 @@ export async function handler(event: any): Promise<any> {
         function: functionName,
         functionResponse: {
           responseBody: {
-            'application/json': {
-              body: JSON.stringify({ result }),
+            'TEXT': {
+              body: typeof result === 'string' ? result : JSON.stringify(result),
             },
           },
         },
@@ -428,7 +429,7 @@ export async function handler(event: any): Promise<any> {
         functionResponse: {
           responseState: 'FAILURE',
           responseBody: {
-            'application/json': {
+            'TEXT': {
               body: JSON.stringify({
                 error: error instanceof Error ? error.message : 'Unknown error',
               }),

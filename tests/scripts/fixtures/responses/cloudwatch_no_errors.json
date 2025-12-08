@@ -1,0 +1,10 @@
+{
+  "events": [],
+  "searchedLogStreams": [
+    {
+      "logStreamName": "2024/12/08/[$LATEST]abc123",
+      "searchedCompletely": true
+    }
+  ],
+  "nextToken": null
+}

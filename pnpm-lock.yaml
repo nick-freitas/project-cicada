@@ -11,12 +11,27 @@ importers:
 
   .:
     devDependencies:
+      '@types/uuid':
+        specifier: ^9.0.8
+        version: 9.0.8
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
       '@typescript-eslint/eslint-plugin':
         specifier: ^6.0.0
         version: 6.21.0(@typescript-eslint/parser@6.21.0(eslint@8.57.1)(typescript@5.9.3))(eslint@8.57.1)(typescript@5.9.3)
       '@typescript-eslint/parser':
         specifier: ^6.0.0
         version: 6.21.0(eslint@8.57.1)(typescript@5.9.3)
+      bats:
+        specifier: ^1.13.0
+        version: 1.13.0
+      bats-assert:
+        specifier: ^2.2.4
+        version: 2.2.4(bats-support@0.3.0(bats@1.13.0))(bats@1.13.0)
+      bats-support:
+        specifier: ^0.3.0
+        version: 0.3.0(bats@1.13.0)
       dotenv:
         specifier: ^17.2.3
         version: 17.2.3
@@ -38,6 +53,12 @@ importers:
       typescript:
         specifier: ^5.0.0
         version: 5.9.3
+      uuid:
+        specifier: ^9.0.1
+        version: 9.0.1
+      ws:
+        specifier: ^8.18.3
+        version: 8.18.3
 
   infrastructure:
     dependencies:
@@ -2261,6 +2282,9 @@ packages:
   '@types/uuid@9.0.8':
     resolution: {integrity: sha512-jg+97EGIcY9AGHJJRaaPVgetKDsrTgbRjQ5Msgjh/DQKEFl0DtyRr/VCOyD1T2R1MNeWPK/u7JoGhlDZnKBAfA==}
 
+  '@types/ws@8.18.1':
+    resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
+
   '@types/yargs-parser@21.0.3':
     resolution: {integrity: sha512-I4q9QU9MQv4oEOz4tAHJtNz1cwuLxn2F3xcc2iV5WdqLPpUnj30aUuxt1mAxYTG+oe8CZMV/+6rU4S4gRDzqtQ==}
 
@@ -2504,6 +2528,21 @@ packages:
 
   baseline-browser-mapping@2.9.2:
     resolution: {integrity: sha512-PxSsosKQjI38iXkmb3d0Y32efqyA0uW4s41u4IVBsLlWLhCiYNpH/AfNOVWRqCQBlD8TFJTz6OUWNd4DFJCnmw==}
+    hasBin: true
+
+  bats-assert@2.2.4:
+    resolution: {integrity: sha512-EcaY4Z+Tbz1c7pnC1SrVSq0epr7tLwFpz6qt7KUW9K8uSw8V12DTfH9d2HxZWvBEATaCuMsZ7KoZMFiSQPRoXw==}
+    peerDependencies:
+      bats: 0.4 || ^1
+      bats-support: ^0.3
+
+  bats-support@0.3.0:
+    resolution: {integrity: sha512-z+2WzXbI4OZgLnynydqH8GpI3+DcOtepO66PlK47SfEzTkiuV9hxn9eIQX+uLVFbt2Oqoc7Ky3TJ/N83lqD+cg==}
+    peerDependencies:
+      bats: 0.4 || ^1
+
+  bats@1.13.0:
+    resolution: {integrity: sha512-giSYKGTOcPZyJDbfbTtzAedLcNWdjCLbXYU3/MwPnjyvDXzu6Dgw8d2M+8jHhZXSmsCMSQqCp+YBsJ603UO4vQ==}
     hasBin: true
 
   binary-extensions@2.3.0:
@@ -4060,6 +4099,18 @@ packages:
   write-file-atomic@4.0.2:
     resolution: {integrity: sha512-7KxauUdBmSdWnmpaGFg+ppNjKF8uNLry8LyzjauQDOVONfFLNKrKvQOxZ/VuTIcS/gge/YNahf5RIIQWTSarlg==}
     engines: {node: ^12.13.0 || ^14.15.0 || >=16.0.0}
+
+  ws@8.18.3:
+    resolution: {integrity: sha512-PEIGCY5tSlUt50cqyMXfCzX+oOPqN0vuGqWzbcJ2xvnkzkq46oOpz7dQaTDBdfICb4N14+GARUDw2XV2N4tvzg==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
 
   xstate@4.38.3:
     resolution: {integrity: sha512-SH7nAaaPQx57dx6qvfcIgqKRXIh4L0A1iYEqim4s1u7c9VoCgzZc+63FY90AKU4ZzOC2cfJzTnpO4zK7fCUzzw==}
@@ -7369,6 +7420,10 @@ snapshots:
 
   '@types/uuid@9.0.8': {}
 
+  '@types/ws@8.18.1':
+    dependencies:
+      '@types/node': 20.19.25
+
   '@types/yargs-parser@21.0.3': {}
 
   '@types/yargs@17.0.35':
@@ -7669,6 +7724,17 @@ snapshots:
   base64-js@1.5.1: {}
 
   baseline-browser-mapping@2.9.2: {}
+
+  bats-assert@2.2.4(bats-support@0.3.0(bats@1.13.0))(bats@1.13.0):
+    dependencies:
+      bats: 1.13.0
+      bats-support: 0.3.0(bats@1.13.0)
+
+  bats-support@0.3.0(bats@1.13.0):
+    dependencies:
+      bats: 1.13.0
+
+  bats@1.13.0: {}
 
   binary-extensions@2.3.0: {}
 
@@ -9359,6 +9425,8 @@ snapshots:
     dependencies:
       imurmurhash: 0.1.4
       signal-exit: 3.0.7
+
+  ws@8.18.3: {}
 
   xstate@4.38.3: {}
 

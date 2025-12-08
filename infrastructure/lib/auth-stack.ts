@@ -66,6 +66,7 @@ export class AuthStack extends cdk.Stack {
             value: 'true',
           },
         ],
+        messageAction: 'SUPPRESS', // Don't send welcome email
       });
     }
 
@@ -83,6 +84,7 @@ export class AuthStack extends cdk.Stack {
             value: 'true',
           },
         ],
+        messageAction: 'SUPPRESS', // Don't send welcome email
       });
     }
 
@@ -100,6 +102,7 @@ export class AuthStack extends cdk.Stack {
             value: 'true',
           },
         ],
+        messageAction: 'SUPPRESS', // Don't send welcome email
       });
     }
 

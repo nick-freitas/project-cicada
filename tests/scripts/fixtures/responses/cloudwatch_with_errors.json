@@ -1,0 +1,25 @@
+{
+  "events": [
+    {
+      "logStreamName": "2024/12/08/[$LATEST]abc123",
+      "timestamp": 1702000000000,
+      "message": "2024-12-08T10:30:00.000Z ERROR Error processing file: Invalid JSON format",
+      "ingestionTime": 1702000001000,
+      "eventId": "12345"
+    },
+    {
+      "logStreamName": "2024/12/08/[$LATEST]abc123",
+      "timestamp": 1702000005000,
+      "message": "2024-12-08T10:30:05.000Z ERROR Bedrock API throttling: Rate exceeded\nThrottlingException: Rate exceeded for model amazon.titan-embed-text-v1",
+      "ingestionTime": 1702000006000,
+      "eventId": "12346"
+    }
+  ],
+  "searchedLogStreams": [
+    {
+      "logStreamName": "2024/12/08/[$LATEST]abc123",
+      "searchedCompletely": true
+    }
+  ],
+  "nextToken": null
+}

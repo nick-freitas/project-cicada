@@ -1,0 +1,155 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CDKBootstrapAndDeploy",
+      "Effect": "Allow",
+      "Action": [
+        "cloudformation:CreateStack",
+        "cloudformation:UpdateStack",
+        "cloudformation:DeleteStack",
+        "cloudformation:DescribeStacks",
+        "cloudformation:DescribeStackEvents",
+        "cloudformation:DescribeStackResources",
+        "cloudformation:GetTemplate",
+        "cloudformation:ValidateTemplate",
+        "cloudformation:CreateChangeSet",
+        "cloudformation:DescribeChangeSet",
+        "cloudformation:ExecuteChangeSet",
+        "cloudformation:DeleteChangeSet"
+      ],
+      "Resource": [
+        "arn:aws:cloudformation:*:*:stack/CDKToolkit/*",
+        "arn:aws:cloudformation:*:*:stack/CICADA*/*",
+        "arn:aws:cloudformation:*:*:stack/ProjectCICADA*/*"
+      ]
+    },
+    {
+      "Sid": "CloudFormationListOperations",
+      "Effect": "Allow",
+      "Action": [
+        "cloudformation:ListStacks",
+        "cloudformation:ListExports"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "S3CDKAssets",
+      "Effect": "Allow",
+      "Action": [
+        "s3:CreateBucket",
+        "s3:PutBucketPolicy",
+        "s3:PutBucketVersioning",
+        "s3:PutEncryptionConfiguration",
+        "s3:PutBucketPublicAccessBlock",
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:ListBucket",
+        "s3:GetBucketLocation",
+        "s3:GetBucketPolicy"
+      ],
+      "Resource": [
+        "arn:aws:s3:::cdk-*",
+        "arn:aws:s3:::cdk-*/*",
+        "arn:aws:s3:::cicadadatastack-*",
+        "arn:aws:s3:::cicadadatastack-*/*",
+        "arn:aws:s3:::projectcicadadatastack-*",
+        "arn:aws:s3:::projectcicadadatastack-*/*"
+      ]
+    },
+    {
+      "Sid": "DynamoDBTables",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:CreateTable",
+        "dynamodb:UpdateTable",
+        "dynamodb:DeleteTable",
+        "dynamodb:DescribeTable",
+        "dynamodb:DescribeTimeToLive",
+        "dynamodb:UpdateTimeToLive",
+        "dynamodb:TagResource",
+        "dynamodb:UntagResource",
+        "dynamodb:ListTagsOfResource",
+        "dynamodb:UpdateContinuousBackups",
+        "dynamodb:PutItem",
+        "dynamodb:GetItem",
+        "dynamodb:Scan",
+        "dynamodb:Query"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:*:*:table/CICADA*",
+        "arn:aws:dynamodb:*:*:table/ProjectCICADA*",
+        "arn:aws:dynamodb:*:*:table/ProjectCICADADataStack-*"
+      ]
+    },
+    {
+      "Sid": "IAMRolesForResources",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole",
+        "iam:DeleteRole",
+        "iam:GetRole",
+        "iam:PassRole",
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:PutRolePolicy",
+        "iam:DeleteRolePolicy",
+        "iam:GetRolePolicy",
+        "iam:TagRole",
+        "iam:UntagRole"
+      ],
+      "Resource": [
+        "arn:aws:iam::*:role/CICADA*",
+        "arn:aws:iam::*:role/cdk-*"
+      ]
+    },
+    {
+      "Sid": "SSMParameters",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:PutParameter",
+        "ssm:GetParameter",
+        "ssm:GetParameters",
+        "ssm:DeleteParameter",
+        "ssm:AddTagsToResource",
+        "ssm:RemoveTagsFromResource"
+      ],
+      "Resource": "arn:aws:ssm:*:*:parameter/cdk-bootstrap/*"
+    },
+    {
+      "Sid": "ECRForLambdaContainers",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:GetAuthorizationToken",
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:BatchGetImage"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "STSAssumeRole",
+      "Effect": "Allow",
+      "Action": [
+        "sts:AssumeRole"
+      ],
+      "Resource": "arn:aws:iam::*:role/cdk-*"
+    },
+    {
+      "Sid": "ReadOnlyForValidation",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetUser",
+        "sts:GetCallerIdentity",
+        "ec2:DescribeAvailabilityZones",
+        "ec2:DescribeVpcs",
+        "ec2:DescribeSubnets",
+        "ec2:DescribeSecurityGroups",
+        "dynamodb:ListTables",
+        "s3:ListAllMyBuckets"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

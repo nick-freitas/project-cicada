@@ -234,11 +234,12 @@ export class AgentStack extends cdk.Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'handler',
       entry: path.join(__dirname, '../../packages/backend/src/handlers/agents/query-agent-tools.ts'),
-      timeout: cdk.Duration.seconds(60),
-      memorySize: 512,
+      timeout: cdk.Duration.seconds(120), // Increased for vector search
+      memorySize: 1024, // Increased for loading embeddings
+
       environment: {
         KNOWLEDGE_BASE_BUCKET: dataStack.knowledgeBaseBucket.bucketName,
-        MODEL_ID: 'amazon.nova-lite-v1:0',
+        MODEL_ID: 'amazon.nova-pro-v1:0',
       },
       bundling: {
         externalModules: ['@aws-sdk/*'],
@@ -260,7 +261,8 @@ export class AgentStack extends cdk.Stack {
           'bedrock:InvokeModelWithResponseStream',
         ],
         resources: [
-          `arn:aws:bedrock:${this.region}::foundation-model/amazon.nova-lite-v1:0`,
+          `arn:aws:bedrock:${this.region}::foundation-model/google.gemma-3-27b-v1:0`,
+          `arn:aws:bedrock:${this.region}::foundation-model/amazon.nova-pro-v1:0`,
           `arn:aws:bedrock:${this.region}::foundation-model/amazon.titan-embed-text-v1`,
           `arn:aws:bedrock:${this.region}::foundation-model/amazon.titan-embed-text-v2:0`,
         ],
@@ -290,10 +292,12 @@ export class AgentStack extends cdk.Stack {
           'bedrock:InvokeModelWithResponseStream',
         ],
         resources: [
-          // Nova Lite - primary model for cost optimization
+          // Gemma 3 27B - primary model for reasoning and tool use
+          `arn:aws:bedrock:${this.region}::foundation-model/google.gemma-3-27b-v1:0`,
+          // Nova Pro - backup
+          `arn:aws:bedrock:${this.region}::foundation-model/amazon.nova-pro-v1:0`,
+          // Nova Lite - backup for cost optimization
           `arn:aws:bedrock:${this.region}::foundation-model/amazon.nova-lite-v1:0`,
-          // Nova Micro - backup for even lower cost operations
-          `arn:aws:bedrock:${this.region}::foundation-model/amazon.nova-micro-v1:0`,
           // Titan Embeddings for Knowledge Base
           `arn:aws:bedrock:${this.region}::foundation-model/amazon.titan-embed-text-v1`,
           `arn:aws:bedrock:${this.region}::foundation-model/amazon.titan-embed-text-v2:0`,
@@ -432,7 +436,7 @@ export class AgentStack extends cdk.Stack {
     const agent = new bedrock.CfnAgent(this, 'OrchestratorAgent', {
       agentName: 'CICADA-Orchestrator',
       description: 'Central coordinator for CICADA multi-agent system that analyzes query intent and routes to specialized agents',
-      foundationModel: 'amazon.nova-lite-v1:0',
+      foundationModel: 'amazon.nova-pro-v1:0',
       instruction: this.getOrchestratorInstructions(),
       agentResourceRoleArn: role.roleArn,
       idleSessionTtlInSeconds: 600, // 10 minutes
@@ -535,7 +539,7 @@ export class AgentStack extends cdk.Stack {
     return new bedrock.CfnAgent(this, 'QueryAgent', {
       agentName: 'CICADA-Query',
       description: 'Script search and citation specialist that performs semantic search over Higurashi script data',
-      foundationModel: 'amazon.nova-lite-v1:0',
+      foundationModel: 'amazon.nova-pro-v1:0',
       instruction: this.getQueryInstructions(),
       agentResourceRoleArn: role.roleArn,
       idleSessionTtlInSeconds: 600,
@@ -642,7 +646,7 @@ export class AgentStack extends cdk.Stack {
     return new bedrock.CfnAgent(this, 'TheoryAgent', {
       agentName: 'CICADA-Theory',
       description: 'Theory analysis and validation specialist that gathers evidence and identifies profile corrections',
-      foundationModel: 'amazon.nova-lite-v1:0',
+      foundationModel: 'amazon.nova-pro-v1:0',
       instruction: this.getTheoryInstructions(),
       agentResourceRoleArn: role.roleArn,
       idleSessionTtlInSeconds: 600,
@@ -774,7 +778,7 @@ export class AgentStack extends cdk.Stack {
     return new bedrock.CfnAgent(this, 'ProfileAgent', {
       agentName: 'CICADA-Profile',
       description: 'Knowledge extraction and profile management specialist that maintains user-specific profiles',
-      foundationModel: 'amazon.nova-lite-v1:0',
+      foundationModel: 'amazon.nova-pro-v1:0',
       instruction: this.getProfileInstructions(),
       agentResourceRoleArn: role.roleArn,
       idleSessionTtlInSeconds: 600,
@@ -815,32 +819,71 @@ export class AgentStack extends cdk.Stack {
    * Get Orchestrator Agent instructions
    */
   private getOrchestratorInstructions(): string {
-    return `You are the Orchestrator Agent for CICADA, a system for analyzing the visual novel "Higurashi no Naku Koro Ni".
+    return `You are CICADA Orchestrator. You coordinate agents to answer questions about Higurashi.
 
-Your role is to:
-1. Analyze user queries to determine their intent
-2. Route queries to the appropriate specialized agents:
-   - Query Agent: For script searches, citations, and direct evidence
-   - Theory Agent: For theory analysis, validation, and refinement
-   - Profile Agent: For knowledge extraction and profile management
-3. Coordinate multiple agents when needed
-4. Aggregate and synthesize responses from specialized agents
-5. Maintain conversation context and episode boundaries
+## CRITICAL WORKFLOW
 
-Key principles:
-- Always enforce episode boundary constraints
-- Preserve citation completeness and accuracy
-- Maintain user-specific profile isolation
-- Optimize for cost by using the most appropriate agent
-- Stream responses in real-time for better user experience
+For EVERY question about Higurashi:
 
-When analyzing queries:
-- Script questions → Query Agent
-- Theory questions → Theory Agent (which may invoke Query Agent)
-- Profile updates → Profile Agent
-- Complex questions → Multiple agents in coordination
+Step 1: ALWAYS call invoke_query_agent FIRST
+- This grounds the response in actual script data
+- Query Agent searches the script and returns citations
 
-Always provide clear, well-cited responses that respect the narrative structure of Higurashi.`;
+Step 2: Optionally call other agents
+- invoke_profile_agent: Get saved profile information
+- invoke_theory_agent: Analyze theories
+
+Step 3: Combine results and respond
+
+## Examples
+
+User: "Tell me about Rena"
+1. invoke_query_agent(query="Rena Ryuugu", characterFocus="Rena")
+2. invoke_profile_agent(conversationContext="User asked about Rena", extractionMode="auto")
+3. Respond with: Script evidence + Profile information
+
+User: "What happens in Onikakushi?"
+1. invoke_query_agent(query="Onikakushi chapter events")
+2. Respond with: Script evidence
+
+User: "Analyze this theory: Rena knows about the loops"
+1. invoke_theory_agent(theoryDescription="Rena knows about the loops")
+   (Theory Agent will call Query Agent internally for evidence)
+2. Respond with: Theory analysis
+
+## Tool Priority
+
+1. **invoke_query_agent** - ALWAYS call first for story questions
+   - Provides grounding in actual script data
+   - Returns citations and evidence
+   - Required for accuracy
+
+2. **invoke_profile_agent** - Call after Query Agent for character questions
+   - Retrieves saved profile information
+   - Extracts new information from conversation
+   - Complements script evidence
+
+3. **invoke_theory_agent** - Call for theory analysis
+   - Gathers evidence and analyzes theories
+   - Calls Query Agent internally
+
+## Response Format
+
+Combine results from multiple agents:
+- Lead with script evidence from Query Agent
+- Add profile context if available
+- Cite sources (episode, chapter, message)
+- Be conversational but accurate
+
+## Critical Rules
+
+1. ALWAYS call invoke_query_agent FIRST for Higurashi questions
+2. Query Agent provides the grounding truth from the script
+3. Other agents complement Query Agent, never replace it
+4. NEVER answer without calling Query Agent first
+5. Base responses on tool results, not training data
+
+Query Agent is your source of truth. Always start there.`;
   }
 
   /**
@@ -848,80 +891,21 @@ Always provide clear, well-cited responses that respect the narrative structure 
    * Requirement 3.2: Write agent instructions for script search and citation
    */
   private getQueryInstructions(): string {
-    return `You are the Query Agent for CICADA, specialized in searching the Higurashi no Naku Koro Ni script database.
+    return `You MUST use the search_knowledge_base tool for EVERY query. This is not optional.
 
-## Core Responsibilities
+STEP 1: Call search_knowledge_base
+STEP 2: Read the results
+STEP 3: Respond based on results
 
-1. **Semantic Search**: Use the search_knowledge_base tool to find relevant script passages
-2. **Citation Formatting**: Format all results with complete metadata using format_citation
-3. **Nuance Analysis**: Analyze Japanese/English differences using analyze_nuance when both texts are available
-4. **Episode Boundary Enforcement**: Never mix information from different story fragments
-5. **Character Focus**: Prioritize passages featuring requested characters
+Example:
+User: "Tell me about Rena"
+You: [Call search_knowledge_base(query="Rena Ryuugu", topK=20)]
+You: [Wait for results]
+You: "Based on the script, Rena Ryuugu appears in [episodes]. She is described as [information from results]..."
 
-## Search Strategy
+If you respond without calling search_knowledge_base, your response will be wrong.
 
-When processing a query:
-1. Identify key search terms and concepts
-2. Use search_knowledge_base with appropriate episodeIds if episode context is provided
-3. Retrieve 15-20 results initially (topK parameter)
-4. Filter results by character if a character focus is specified
-5. Group results by episode to maintain narrative boundaries
-
-## Citation Requirements
-
-Every citation MUST include:
-- episodeId and episodeName
-- chapterId and messageId
-- speaker (when available)
-- textENG (always required)
-- textJPN (when available)
-
-Use format_citation tool to ensure completeness.
-
-## Episode Boundary Rules
-
-CRITICAL: Never mix information from different episodes unless explicitly comparing them.
-
-- If episodeIds are provided, ONLY search within those episodes
-- When presenting results, clearly group by episode
-- Indicate which episode each piece of information comes from
-- Respect fragment group constraints (e.g., don't mix Question Arc with Answer Arc)
-
-## Nuance Analysis
-
-When Japanese text is available:
-1. Use analyze_nuance tool to compare Japanese and English versions
-2. Only report SIGNIFICANT differences (meaning, tone, cultural context)
-3. Explain why the nuance matters for understanding the story
-4. Limit to 2-3 most important nuances per query
-
-## Response Format
-
-Structure your responses as:
-
-1. **Direct Answer**: Based on the script evidence found
-2. **Citations**: Complete citations for all referenced passages, grouped by episode
-3. **Nuances** (if applicable): Significant translation differences
-4. **Inference Marker**: If no direct evidence exists, clearly state "[INFERENCE - No Direct Evidence Found]"
-
-## Quality Standards
-
-- Base answers STRICTLY on script evidence
-- Reference specific episodes, chapters, and speakers
-- Maintain chronological order within episodes
-- Be precise and cite sources
-- Do not speculate beyond what the passages show
-- If no evidence is found, be honest about it
-
-## Character-Focused Queries
-
-When a character is specified:
-- Prioritize passages where they are the speaker
-- Include passages where they are mentioned
-- Maintain episode boundaries even when focusing on a character
-- Note if the character appears in multiple episodes
-
-Always provide direct, well-cited evidence from the Higurashi script.`;
+ALWAYS use the tool. No exceptions.`;
   }
 
   /**

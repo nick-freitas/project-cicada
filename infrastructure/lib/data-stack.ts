@@ -116,6 +116,54 @@ export class DataStack extends cdk.Stack {
       indexPrefix: 'embeddings/',
     };
 
+    // Create script ingestion handler Lambda
+    const scriptIngestionHandler = new cdk.aws_lambda_nodejs.NodejsFunction(
+      this,
+      'ScriptIngestionHandler',
+      {
+        runtime: cdk.aws_lambda.Runtime.NODEJS_20_X,
+        handler: 'handler',
+        entry: require('path').join(
+          __dirname,
+          '../../packages/backend/src/handlers/script-ingestion-handler.ts'
+        ),
+        timeout: cdk.Duration.minutes(5), // Processing can take time
+        memorySize: 1024,
+        environment: {
+          SCRIPT_BUCKET_NAME: this.scriptDataBucket.bucketName,
+          KB_BUCKET_NAME: this.knowledgeBaseBucket.bucketName,
+          KNOWLEDGE_BASE_BUCKET: this.knowledgeBaseBucket.bucketName,
+          EPISODE_CONFIG_TABLE_NAME: this.episodeConfigTable.tableName,
+        },
+        bundling: {
+          externalModules: ['@aws-sdk/*'],
+          minify: true,
+        },
+      }
+    );
+
+    // Grant permissions to script ingestion handler
+    this.scriptDataBucket.grantReadWrite(scriptIngestionHandler);
+    this.knowledgeBaseBucket.grantReadWrite(scriptIngestionHandler);
+    this.episodeConfigTable.grantReadData(scriptIngestionHandler);
+
+    // Grant Bedrock permissions for embeddings
+    scriptIngestionHandler.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['bedrock:InvokeModel'],
+        resources: ['*'],
+      })
+    );
+
+    // Add S3 trigger for script ingestion
+    scriptIngestionHandler.addEventSource(
+      new cdk.aws_lambda_event_sources.S3EventSource(this.scriptDataBucket, {
+        events: [s3.EventType.OBJECT_CREATED],
+        filters: [{ suffix: '.json' }],
+      })
+    );
+
     // Export bucket names for use in other stacks
     new cdk.CfnOutput(this, 'KnowledgeBaseBucketName', {
       value: this.knowledgeBaseBucket.bucketName,

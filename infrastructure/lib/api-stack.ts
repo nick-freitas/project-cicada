@@ -11,6 +11,7 @@ import * as sfn from 'aws-cdk-lib/aws-stepfunctions';
 import * as tasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
 import * as events from 'aws-cdk-lib/aws-events';
 import * as eventsTargets from 'aws-cdk-lib/aws-events-targets';
+import * as s3 from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
 import { DataStack } from './data-stack';
 import { AgentStack } from './agent-stack';

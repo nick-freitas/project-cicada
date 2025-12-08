@@ -53,21 +53,23 @@ export function useWebSocket(): UseWebSocketReturn {
       const data = JSON.parse(event.data);
 
       if (data.type === 'chunk') {
-        // Append chunk to existing message
+        // Append chunk to existing assistant message or create new one
         setMessages((prev) => {
-          const existing = prev.find((m) => m.id === data.requestId);
-          if (existing) {
+          const existingAssistant = prev.find(
+            (m) => m.id === `assistant-${data.requestId}` && m.role === 'assistant'
+          );
+          if (existingAssistant) {
             return prev.map((m) =>
-              m.id === data.requestId
+              m.id === `assistant-${data.requestId}`
                 ? { ...m, content: m.content + data.content, status: 'streaming' as const }
                 : m
             );
           } else {
-            // Create new assistant message
+            // Create new assistant message with unique ID
             return [
               ...prev,
               {
-                id: data.requestId,
+                id: `assistant-${data.requestId}`,
                 role: 'assistant' as const,
                 content: data.content,
                 timestamp: new Date(),
@@ -77,17 +79,17 @@ export function useWebSocket(): UseWebSocketReturn {
           }
         });
       } else if (data.type === 'complete') {
-        // Mark message as complete
+        // Mark assistant message as complete
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === data.requestId ? { ...m, status: 'complete' as const } : m
+            m.id === `assistant-${data.requestId}` ? { ...m, status: 'complete' as const } : m
           )
         );
         pendingRequests.current.delete(data.requestId);
       } else if (data.type === 'error') {
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === data.requestId
+            m.id === `assistant-${data.requestId}`
               ? { ...m, content: m.content + '\n\nError: ' + data.message, status: 'error' as const }
               : m
           )

@@ -64,7 +64,7 @@ export class ScriptIngestionService {
       logger.info('Parsed script JSON', { messageCount: parsed.length });
       return parsed;
     } catch (error) {
-      logger.error('Failed to parse script JSON', { error });
+      logger.error('Failed to parse script JSON', error);
       throw new Error(`JSON parsing failed: ${error}`);
     }
   }
@@ -87,8 +87,16 @@ export class ScriptIngestionService {
         throw new Error(`No episode configuration found for filename: ${filename}`);
       }
       
+      // Filter for MSGSET entries only
+      const msgsetMessages = messages.filter((msg) => msg.type === 'MSGSET');
+      
+      logger.info('Filtered for MSGSET entries', {
+        totalMessages: messages.length,
+        msgsetCount: msgsetMessages.length,
+      });
+      
       // Add episode and chapter metadata to each message
-      const processedMessages: ScriptMessage[] = messages.map((msg) => ({
+      const processedMessages: ScriptMessage[] = msgsetMessages.map((msg) => ({
         ...msg,
         episodeId: episodeConfig.episodeId,
         chapterId,
@@ -108,7 +116,7 @@ export class ScriptIngestionService {
         chapterId,
       };
     } catch (error) {
-      logger.error('Failed to associate chapter with episode', { error, filename });
+      logger.error('Failed to associate chapter with episode', error, { filename });
       throw error;
     }
   }
@@ -138,7 +146,7 @@ export class ScriptIngestionService {
       
       return embedding;
     } catch (error) {
-      logger.error('Failed to generate embedding', { error, textLength: text.length });
+      logger.error('Failed to generate embedding', error, { textLength: text.length });
       throw error;
     }
   }
@@ -162,7 +170,7 @@ export class ScriptIngestionService {
       logger.info('Stored script data in S3', { key });
       return key;
     } catch (error) {
-      logger.error('Failed to store script data', { error, data });
+      logger.error('Failed to store script data', error, { data });
       throw error;
     }
   }
@@ -190,7 +198,7 @@ export class ScriptIngestionService {
       logger.info('Retrieved script data from S3', { key });
       return data;
     } catch (error) {
-      logger.error('Failed to retrieve script data', { error, episodeId, chapterId });
+      logger.error('Failed to retrieve script data', error, { episodeId, chapterId });
       throw error;
     }
   }
@@ -240,7 +248,7 @@ export class ScriptIngestionService {
         messageCount: data.messages.length,
       });
     } catch (error) {
-      logger.error('Failed to index in Knowledge Base', { error, data });
+      logger.error('Failed to index in Knowledge Base', error, { data });
       throw error;
     }
   }
@@ -266,7 +274,7 @@ export class ScriptIngestionService {
       
       logger.info('Successfully processed script file', { filename });
     } catch (error) {
-      logger.error('Failed to process script file', { error, filename });
+      logger.error('Failed to process script file', error, { filename });
       throw error;
     }
   }
