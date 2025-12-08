@@ -379,15 +379,26 @@ dsass
   - Track model usage per request
   - _Requirements: 25.1, 25.2, 25.3, 25.4, 25.5_
 
-- [ ] 28. Final Checkpoint - End-to-end testing
+- [x] 28. Final Checkpoint - End-to-end testing
   - Run full E2E test suite
   - Test all user flows
   - Verify cost is under budget
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 29. Documentation and deployment
-  - Write deployment guide
-  - Write user guide
+- [ ] 29. Nonprod deployment and documentation
+  - Update deployment documentation
+  - Create user guide for nonprod environment
   - Create architecture diagrams
-  - Deploy to production
-  - Run smoke tests
+  - Deploy to nonprod environment
+  - Run smoke tests in nonprod
+  - Verify all features work end-to-end
+  - Monitor costs and performance
+
+- [ ] 30. Production deployment
+  - Review nonprod deployment results
+  - Update production configuration
+  - Deploy to production environment
+  - Run production smoke tests
+  - Set up production monitoring
+  - Verify production costs are under budget
+  - Document production deployment
