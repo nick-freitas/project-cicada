@@ -29,7 +29,7 @@
   - **Property 1: Agent Invocation Consistency**
   - **Validates: Requirements 9.1, 9.2**
 
-- [ ] 4. Update Message Processor to invoke Orchestrator via AgentCore
+- [x] 4. Update Message Processor to invoke Orchestrator via AgentCore
   - Modify packages/backend/src/handlers/websocket/message-processor.ts
   - Replace direct Bedrock calls with BedrockAgentRuntimeClient
   - Implement InvokeAgentCommand with streaming
@@ -37,7 +37,7 @@
   - Maintain existing WebSocket message format
   - _Requirements: 7.1, 7.4, 8.1_
 
-- [ ] 4.1 Write property test for streaming completeness
+- [x] 4.1 Write property test for streaming completeness
   - **Property 2: Streaming Completeness**
   - **Validates: Requirements 8.1, 8.2**
 

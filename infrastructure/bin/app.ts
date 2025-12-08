@@ -2,6 +2,7 @@
 import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
 import { DataStack } from '../lib/data-stack';
+import { AgentStack } from '../lib/agent-stack';
 import { APIStack } from '../lib/api-stack';
 import { AuthStack } from '../lib/auth-stack';
 import { FrontendStack } from '../lib/frontend-stack';
@@ -16,6 +17,12 @@ const env = {
 
 // Data layer - S3, DynamoDB, Knowledge Base
 const dataStack = new DataStack(app, 'ProjectCICADADataStack', { env });
+
+// Agent layer - AgentCore agents (Orchestrator, Query, Theory, Profile)
+const agentStack = new AgentStack(app, 'ProjectCICADAAgentStack', {
+  env,
+  dataStack,
+});
 
 // Auth layer - Cognito
 const authStack = new AuthStack(app, 'ProjectCICADAAuthStack', {
