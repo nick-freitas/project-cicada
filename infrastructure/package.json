@@ -23,6 +23,7 @@
     "destroy": "dotenv -e ../.env.nonprod -- cdk destroy --all"
   },
   "dependencies": {
+    "@aws-sdk/client-bedrock-agent": "^3.943.0",
     "aws-cdk-lib": "^2.100.0",
     "constructs": "^10.0.0",
     "source-map-support": "^0.5.21"

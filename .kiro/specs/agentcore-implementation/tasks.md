@@ -2,7 +2,7 @@
 
 ## Implementation Plan
 
-- [ ] 1. Set up AgentCore dependencies and infrastructure foundation
+- [x] 1. Set up AgentCore dependencies and infrastructure foundation
   - Install @aws-sdk/client-bedrock-agent-runtime package
   - Install @aws-sdk/client-bedrock-agent package for CDK
   - Research Strands SDK availability and installation (if available as separate package)
