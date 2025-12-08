@@ -36,6 +36,8 @@ export class AgentStack extends cdk.Stack {
   public readonly profileAgentAlias: bedrock.CfnAgentAlias;
 
   public readonly queryAgentToolsFunction: lambdaNodejs.NodejsFunction;
+  public readonly orchestratorAgentToolsFunction: lambdaNodejs.NodejsFunction;
+  public readonly theoryAgentToolsFunction: lambdaNodejs.NodejsFunction;
 
   constructor(scope: Construct, id: string, props: AgentStackProps) {
     super(scope, id, props);
@@ -48,12 +50,23 @@ export class AgentStack extends cdk.Stack {
     // Requirement 3.4: Implement tool handlers for semantic search integration
     this.queryAgentToolsFunction = this.createQueryAgentToolsFunction(props.dataStack);
 
+    // Create Lambda function for Orchestrator Agent tools
+    // Requirement 2.3: Implement tool handler that calls Query Agent via BedrockAgentRuntime
+    this.orchestratorAgentToolsFunction = this.createOrchestratorAgentToolsFunction();
+
+    // Create Lambda function for Theory Agent tools
+    // Requirement 4.2: Implement tool handler for invoking Query Agent
+    this.theoryAgentToolsFunction = this.createTheoryAgentToolsFunction(props.dataStack);
+
     // Create agents
     // Requirement 6.1: Use CDK constructs for AgentCore agent deployment
-    this.orchestratorAgent = this.createOrchestratorAgent(agentRole);
     this.queryAgent = this.createQueryAgent(agentRole, this.queryAgentToolsFunction);
-    this.theoryAgent = this.createTheoryAgent(agentRole);
+    this.theoryAgent = this.createTheoryAgent(agentRole, this.theoryAgentToolsFunction);
     this.profileAgent = this.createProfileAgent(agentRole);
+    
+    // Create Orchestrator Agent last, after other agents are created
+    // so we can pass their IDs as environment variables
+    this.orchestratorAgent = this.createOrchestratorAgent(agentRole, this.orchestratorAgentToolsFunction);
 
     // Create agent aliases (required for invocation)
     this.orchestratorAgentAlias = this.createAgentAlias(
@@ -81,9 +94,98 @@ export class AgentStack extends cdk.Stack {
     // Requirement 6.3: Set up agent-to-agent invocation permissions
     this.configureAgentPermissions(agentRole);
 
+    // Update Orchestrator tools function with agent IDs
+    // Requirement 2.3: Configure permissions for Orchestrator → Query Agent invocation
+    this.orchestratorAgentToolsFunction.addEnvironment('QUERY_AGENT_ID', this.queryAgent.attrAgentId);
+    this.orchestratorAgentToolsFunction.addEnvironment('QUERY_AGENT_ALIAS_ID', this.queryAgentAlias.attrAgentAliasId);
+    this.orchestratorAgentToolsFunction.addEnvironment('THEORY_AGENT_ID', this.theoryAgent.attrAgentId);
+    this.orchestratorAgentToolsFunction.addEnvironment('THEORY_AGENT_ALIAS_ID', this.theoryAgentAlias.attrAgentAliasId);
+    this.orchestratorAgentToolsFunction.addEnvironment('PROFILE_AGENT_ID', this.profileAgent.attrAgentId);
+    this.orchestratorAgentToolsFunction.addEnvironment('PROFILE_AGENT_ALIAS_ID', this.profileAgentAlias.attrAgentAliasId);
+
+    // Update Theory Agent tools function with Query Agent IDs
+    // Requirement 4.2: Configure permissions for Theory Agent → Query Agent invocation
+    this.theoryAgentToolsFunction.addEnvironment('QUERY_AGENT_ID', this.queryAgent.attrAgentId);
+    this.theoryAgentToolsFunction.addEnvironment('QUERY_AGENT_ALIAS_ID', this.queryAgentAlias.attrAgentAliasId);
+
     // Export agent IDs and alias IDs as stack outputs
     // Requirement 6.4: Export agent IDs and alias IDs as stack outputs
     this.createOutputs();
+  }
+
+  /**
+   * Create Lambda function for Orchestrator Agent tools
+   * Requirement 2.3: Implement tool handler that calls Query Agent via BedrockAgentRuntime
+   */
+  private createOrchestratorAgentToolsFunction(): lambdaNodejs.NodejsFunction {
+    const orchestratorToolsFunction = new lambdaNodejs.NodejsFunction(this, 'OrchestratorAgentToolsFunction', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'handler',
+      entry: path.join(__dirname, '../../packages/backend/src/handlers/agents/orchestrator-agent-tools.ts'),
+      timeout: cdk.Duration.seconds(120), // Longer timeout for agent-to-agent calls
+      memorySize: 512,
+      environment: {
+        // Agent IDs will be set after agents are created
+      },
+      bundling: {
+        externalModules: ['@aws-sdk/*'],
+        minify: true,
+      },
+    });
+
+    // Grant permissions to invoke other agents
+    orchestratorToolsFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['bedrock:InvokeAgent'],
+        resources: [
+          `arn:aws:bedrock:${this.region}:${this.account}:agent/*`,
+          `arn:aws:bedrock:${this.region}:${this.account}:agent-alias/*`,
+        ],
+      })
+    );
+
+    return orchestratorToolsFunction;
+  }
+
+  /**
+   * Create Lambda function for Theory Agent tools
+   * Requirement 4.2: Implement tool handler for invoking Query Agent
+   * Requirement 4.4: Implement tool handlers for Profile Service integration
+   */
+  private createTheoryAgentToolsFunction(dataStack: DataStack): lambdaNodejs.NodejsFunction {
+    const theoryToolsFunction = new lambdaNodejs.NodejsFunction(this, 'TheoryAgentToolsFunction', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'handler',
+      entry: path.join(__dirname, '../../packages/backend/src/handlers/agents/theory-agent-tools.ts'),
+      timeout: cdk.Duration.seconds(120), // Longer timeout for agent-to-agent calls
+      memorySize: 512,
+      environment: {
+        USER_PROFILES_TABLE: dataStack.userProfilesTable.tableName,
+        // Query Agent IDs will be set after agents are created
+      },
+      bundling: {
+        externalModules: ['@aws-sdk/*'],
+        minify: true,
+      },
+    });
+
+    // Grant permissions to invoke Query Agent
+    theoryToolsFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['bedrock:InvokeAgent'],
+        resources: [
+          `arn:aws:bedrock:${this.region}:${this.account}:agent/*`,
+          `arn:aws:bedrock:${this.region}:${this.account}:agent-alias/*`,
+        ],
+      })
+    );
+
+    // Grant permissions to access DynamoDB for profile operations
+    dataStack.userProfilesTable.grantReadWriteData(theoryToolsFunction);
+
+    return theoryToolsFunction;
   }
 
   /**
@@ -100,7 +202,6 @@ export class AgentStack extends cdk.Stack {
       environment: {
         KNOWLEDGE_BASE_BUCKET: dataStack.knowledgeBaseBucket.bucketName,
         MODEL_ID: 'amazon.nova-lite-v1:0',
-        AWS_REGION: this.region,
       },
       bundling: {
         externalModules: ['@aws-sdk/*'],
@@ -209,7 +310,10 @@ export class AgentStack extends cdk.Stack {
    * Requirement 2.1: Create agent definition using CDK CfnAgent construct
    * Requirement 2.5: Configure foundation model (Nova Lite) and streaming
    */
-  private createOrchestratorAgent(role: iam.Role): bedrock.CfnAgent {
+  private createOrchestratorAgent(role: iam.Role, toolsFunction: lambdaNodejs.NodejsFunction): bedrock.CfnAgent {
+    // Grant the agent permission to invoke the Lambda function
+    toolsFunction.grantInvoke(role);
+
     // Requirement 2.2: Define tools for invoking Query, Theory, and Profile agents
     // Action groups define the tools available to the agent
     const actionGroups: bedrock.CfnAgent.AgentActionGroupProperty[] = [
@@ -217,6 +321,9 @@ export class AgentStack extends cdk.Stack {
         actionGroupName: 'AgentInvocationTools',
         description: 'Tools for invoking specialized agents (Query, Theory, Profile)',
         actionGroupState: 'ENABLED',
+        actionGroupExecutor: {
+          lambda: toolsFunction.functionArn,
+        },
         functionSchema: {
           functions: [
             {
@@ -279,9 +386,6 @@ export class AgentStack extends cdk.Stack {
             },
           ],
         },
-        // Action group executor will be a Lambda function that handles tool invocations
-        // This will be implemented in task 6 (Configure Orchestrator to invoke Query Agent)
-        // For now, we define the schema so the agent knows what tools are available
         skipResourceInUseCheckOnDelete: true,
       },
     ];
@@ -348,42 +452,12 @@ export class AgentStack extends cdk.Stack {
             },
             {
               name: 'format_citation',
-              description: 'Format a search result as a complete citation with all required metadata (episode, chapter, message ID, speaker, text).',
+              description: 'Format a search result as a complete citation with all required metadata. This tool is typically not needed as search results already include complete citation metadata.',
               parameters: {
-                episodeId: {
+                citationData: {
                   type: 'string',
-                  description: 'Episode ID',
+                  description: 'JSON string containing episodeId, episodeName, chapterId, messageId, speaker (optional), textENG, textJPN (optional)',
                   required: true,
-                },
-                episodeName: {
-                  type: 'string',
-                  description: 'Episode name',
-                  required: true,
-                },
-                chapterId: {
-                  type: 'string',
-                  description: 'Chapter ID',
-                  required: true,
-                },
-                messageId: {
-                  type: 'number',
-                  description: 'Message ID',
-                  required: true,
-                },
-                speaker: {
-                  type: 'string',
-                  description: 'Speaker name (optional)',
-                  required: false,
-                },
-                textENG: {
-                  type: 'string',
-                  description: 'English text',
-                  required: true,
-                },
-                textJPN: {
-                  type: 'string',
-                  description: 'Japanese text (optional)',
-                  required: false,
                 },
               },
             },
@@ -433,8 +507,99 @@ export class AgentStack extends cdk.Stack {
   /**
    * Create Theory Agent
    * Specialized agent for theory analysis and validation
+   * Requirement 4.1: Create Theory Agent definition in CDK
+   * Requirement 4.5: Configure foundation model and streaming
    */
-  private createTheoryAgent(role: iam.Role): bedrock.CfnAgent {
+  private createTheoryAgent(role: iam.Role, toolsFunction: lambdaNodejs.NodejsFunction): bedrock.CfnAgent {
+    // Grant the agent permission to invoke the Lambda function
+    toolsFunction.grantInvoke(role);
+
+    // Requirement 4.3: Define tools for evidence gathering, profile access, refinement generation
+    const actionGroups: bedrock.CfnAgent.AgentActionGroupProperty[] = [
+      {
+        actionGroupName: 'TheoryAnalysisTools',
+        description: 'Tools for theory analysis, evidence gathering, and profile management',
+        actionGroupState: 'ENABLED',
+        actionGroupExecutor: {
+          lambda: toolsFunction.functionArn,
+        },
+        functionSchema: {
+          functions: [
+            {
+              name: 'invoke_query_agent',
+              description: 'Invoke the Query Agent to gather evidence from the script. Use this to find supporting or contradicting evidence for theories.',
+              parameters: {
+                query: {
+                  type: 'string',
+                  description: 'The search query to find evidence in the script',
+                  required: true,
+                },
+                episodeContext: {
+                  type: 'array',
+                  description: 'Optional list of episode IDs to constrain the search',
+                  required: false,
+                },
+              },
+            },
+            {
+              name: 'get_theory_profile',
+              description: 'Retrieve an existing theory profile to see previous analysis, evidence, and status.',
+              parameters: {
+                userId: {
+                  type: 'string',
+                  description: 'User ID',
+                  required: true,
+                },
+                theoryName: {
+                  type: 'string',
+                  description: 'Name of the theory to retrieve',
+                  required: true,
+                },
+              },
+            },
+            {
+              name: 'update_theory_profile',
+              description: 'Update or create a theory profile with analysis results, evidence, and status.',
+              parameters: {
+                userId: {
+                  type: 'string',
+                  description: 'User ID',
+                  required: true,
+                },
+                theoryName: {
+                  type: 'string',
+                  description: 'Name of the theory',
+                  required: true,
+                },
+                theoryData: {
+                  type: 'string',
+                  description: 'JSON string containing description, status, supportingEvidence array, and contradictingEvidence array',
+                  required: true,
+                },
+              },
+            },
+            {
+              name: 'get_character_profile',
+              description: 'Retrieve a character profile to get context about character traits, relationships, and appearances.',
+              parameters: {
+                userId: {
+                  type: 'string',
+                  description: 'User ID',
+                  required: true,
+                },
+                characterName: {
+                  type: 'string',
+                  description: 'Name of the character',
+                  required: true,
+                },
+              },
+            },
+          ],
+        },
+        skipResourceInUseCheckOnDelete: true,
+      },
+    ];
+
     return new bedrock.CfnAgent(this, 'TheoryAgent', {
       agentName: 'CICADA-Theory',
       description: 'Theory analysis and validation specialist that gathers evidence and identifies profile corrections',
@@ -442,6 +607,7 @@ export class AgentStack extends cdk.Stack {
       instruction: this.getTheoryInstructions(),
       agentResourceRoleArn: role.roleArn,
       idleSessionTtlInSeconds: 600,
+      actionGroups: actionGroups,
     });
   }
 
@@ -604,30 +770,99 @@ Always provide direct, well-cited evidence from the Higurashi script.`;
 
   /**
    * Get Theory Agent instructions
+   * Requirement 4.1: Write agent instructions for theory analysis
    */
   private getTheoryInstructions(): string {
-    return `You are the Theory Agent for CICADA, specialized in theory analysis and validation.
+    return `You are the Theory Agent for CICADA, specialized in analyzing theories about the visual novel "Higurashi no Naku Koro Ni".
 
-Your responsibilities:
-1. Analyze user theories about the Higurashi narrative
-2. Gather supporting and contradicting evidence via the Query Agent
-3. Identify profile corrections when theories challenge existing knowledge
-4. Generate theory refinement suggestions
-5. Maintain evidence-based reasoning
+## Core Responsibilities
 
-Analysis approach:
-- Gather comprehensive evidence before drawing conclusions
-- Consider both supporting and contradicting evidence
-- Identify gaps in current knowledge
-- Suggest refinements to improve theory accuracy
-- Flag profile information that may need correction
+1. **Theory Analysis**: Evaluate user-proposed theories against script evidence
+2. **Evidence Gathering**: Use invoke_query_agent to find supporting and contradicting evidence
+3. **Profile Integration**: Access character and theory profiles for context
+4. **Theory Management**: Update theory profiles with analysis results
+5. **Refinement Suggestions**: Propose ways to improve theories based on evidence
 
-Profile correction criteria:
-- Evidence directly contradicts existing profile data
-- Multiple sources support the correction
-- Correction is specific and actionable
+## Analysis Workflow
 
-Always maintain objectivity and base conclusions on script evidence.`;
+When analyzing a theory:
+
+1. **Check Existing Theory**: Use get_theory_profile to see if this theory has been analyzed before
+2. **Gather Evidence**: Use invoke_query_agent multiple times with different search queries to find:
+   - Supporting evidence (passages that support the theory)
+   - Contradicting evidence (passages that contradict the theory)
+   - Related context (background information)
+3. **Access Profiles**: Use get_character_profile to understand character context
+4. **Analyze Evidence**: Evaluate the quality and relevance of evidence
+5. **Update Theory**: Use update_theory_profile to save your analysis
+
+## Evidence Gathering Strategy
+
+Generate 2-4 specific search queries based on the theory:
+- Focus on concrete events, dialogue, or character actions
+- Search for both supporting and contradicting evidence
+- Consider different episodes if the theory spans multiple arcs
+- Look for patterns and connections
+
+Example: For theory "Rena knows about the time loops"
+- Query 1: "Rena mentions time or repetition"
+- Query 2: "Rena acts with foreknowledge"
+- Query 3: "Rena's behavior changes across episodes"
+
+## Theory Status Determination
+
+Assign status based on evidence:
+- **proposed**: No evidence gathered yet, or insufficient evidence
+- **supported**: Strong supporting evidence, minimal contradictions (2:1 ratio or better)
+- **refuted**: Strong contradicting evidence outweighs support
+- **refined**: Mixed evidence, theory needs adjustment
+
+## Refinement Suggestions
+
+When evidence is mixed or contradictory:
+1. Identify specific aspects that need adjustment
+2. Suggest how to narrow or broaden the theory
+3. Propose alternative interpretations
+4. Recommend additional evidence to gather
+
+## Profile Corrections
+
+If user challenges evidence or you discover errors:
+1. Note what information appears incorrect
+2. Identify which profile contains the error
+3. Explain what the correction should be
+4. Provide reasoning based on script evidence
+
+## Response Format
+
+Structure your analysis as:
+
+1. **Theory Summary**: Restate the theory being analyzed
+2. **Existing Context**: If theory profile exists, summarize previous analysis
+3. **Evidence Gathered**: List key supporting and contradicting passages
+4. **Analysis**: Evaluate the theory against evidence
+5. **Status**: Assign theory status with reasoning
+6. **Refinements** (if applicable): Suggest improvements
+7. **Profile Updates**: Note any profile corrections needed
+
+## Quality Standards
+
+- Base all conclusions on script evidence
+- Be objective and balanced
+- Acknowledge uncertainty when evidence is ambiguous
+- Cite specific episodes, chapters, and passages
+- Maintain episode boundaries (don't mix contradictory fragments)
+- Consider multiple interpretations when appropriate
+
+## Episode Boundary Awareness
+
+Higurashi has multiple story fragments (Question Arcs, Answer Arcs):
+- Information from different fragments may contradict
+- Always note which episode evidence comes from
+- Be cautious about theories that span multiple fragments
+- Respect fragment group constraints
+
+Always provide evidence-based, balanced analysis that helps users develop and refine their theories.`;
   }
 
   /**
@@ -740,6 +975,16 @@ Always ensure profile updates are accurate, well-sourced, and user-specific.`;
     new cdk.CfnOutput(this, 'QueryAgentToolsFunctionArn', {
       value: this.queryAgentToolsFunction.functionArn,
       description: 'Query Agent Tools Lambda Function ARN',
+    });
+
+    new cdk.CfnOutput(this, 'OrchestratorAgentToolsFunctionArn', {
+      value: this.orchestratorAgentToolsFunction.functionArn,
+      description: 'Orchestrator Agent Tools Lambda Function ARN',
+    });
+
+    new cdk.CfnOutput(this, 'TheoryAgentToolsFunctionArn', {
+      value: this.theoryAgentToolsFunction.functionArn,
+      description: 'Theory Agent Tools Lambda Function ARN',
     });
   }
 }

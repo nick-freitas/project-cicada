@@ -41,7 +41,7 @@
   - **Property 2: Streaming Completeness**
   - **Validates: Requirements 8.1, 8.2**
 
-- [x] 5. Implement Query Agent with AgentCore
+f - [x] 5. Implement Query Agent with AgentCore
   - Create Query Agent definition in CDK
   - Write agent instructions for script search and citation
   - Define tools for Knowledge Base search, citation formatting, nuance analysis
@@ -53,18 +53,18 @@
   - **Property 4: Citation Preservation**
   - **Validates: Requirements 3.4, 9.3**
 
-- [ ] 6. Configure Orchestrator to invoke Query Agent
+- [x] 6. Configure Orchestrator to invoke Query Agent
   - Add invokeQueryAgent tool to Orchestrator
   - Implement tool handler that calls Query Agent via BedrockAgentRuntime
   - Configure permissions for Orchestrator → Query Agent invocation
   - Test agent-to-agent invocation
   - _Requirements: 2.3, 7.2_
 
-- [ ] 6.1 Write property test for agent coordination correctness
+- [x] 6.1 Write property test for agent coordination correctness
   - **Property 3: Agent Coordination Correctness**
   - **Validates: Requirements 2.2, 2.3**
 
-- [ ] 7. Implement Theory Agent with AgentCore
+- [x] 7. Implement Theory Agent with AgentCore
   - Create Theory Agent definition in CDK
   - Write agent instructions for theory analysis
   - Define tools for evidence gathering, profile access, refinement generation
@@ -72,7 +72,7 @@
   - Configure foundation model and streaming
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
 
-- [ ] 8. Configure Orchestrator to invoke Theory Agent
+- [x] 8. Configure Orchestrator to invoke Theory Agent
   - Add invokeTheoryAgent tool to Orchestrator
   - Implement tool handler that calls Theory Agent via BedrockAgentRuntime
   - Configure permissions for Orchestrator → Theory Agent invocation
