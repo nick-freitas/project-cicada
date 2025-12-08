@@ -1,13 +1,18 @@
 import * as cdk from 'aws-cdk-lib';
 import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 import * as budgets from 'aws-cdk-lib/aws-budgets';
+import * as sns from 'aws-cdk-lib/aws-sns';
+import * as subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
+import * as actions from 'aws-cdk-lib/aws-cloudwatch-actions';
 import { Construct } from 'constructs';
 import { DataStack } from './data-stack';
 import { APIStack } from './api-stack';
+import { AgentStack } from './agent-stack';
 
 export interface MonitoringStackProps extends cdk.StackProps {
   dataStack: DataStack;
   apiStack: APIStack;
+  agentStack?: AgentStack;
   alertEmail?: string;
   monthlyBudgetLimit?: number; // Default: $100
   dailyBudgetLimit?: number; // Default: $3.33 (~$100/30)
@@ -15,8 +20,10 @@ export interface MonitoringStackProps extends cdk.StackProps {
 
 export class MonitoringStack extends cdk.Stack {
   public readonly dashboard: cloudwatch.Dashboard;
+  public agentDashboard?: cloudwatch.Dashboard;
   public readonly monthlyBudget: budgets.CfnBudget;
   public readonly dailyBudget: budgets.CfnBudget;
+  public alarmTopic?: sns.Topic;
 
   constructor(scope: Construct, id: string, props: MonitoringStackProps) {
     super(scope, id, props);
@@ -282,6 +289,388 @@ export class MonitoringStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'DailyBudgetLimit', {
       value: dailyLimit.toString(),
       description: 'Daily budget limit in USD',
+    });
+
+    // Create SNS topic for alarms if email is provided
+    // Requirement 13.5: Set up alarms for agent errors
+    if (props.alertEmail) {
+      this.alarmTopic = new sns.Topic(this, 'AlarmTopic', {
+        displayName: 'CICADA Monitoring Alarms',
+        topicName: 'CICADA-Alarms',
+      });
+
+      this.alarmTopic.addSubscription(
+        new subscriptions.EmailSubscription(props.alertEmail)
+      );
+    }
+
+    // Create agent-specific monitoring if agent stack is provided
+    // Requirement 13.1, 13.2, 13.3, 13.4: Agent monitoring and observability
+    if (props.agentStack) {
+      this.createAgentMonitoring(props.agentStack);
+    }
+  }
+
+  /**
+   * Create agent-specific monitoring dashboard and alarms
+   * Requirements: 13.1, 13.2, 13.3, 13.4, 13.5
+   */
+  private createAgentMonitoring(agentStack: AgentStack): void {
+    // Create agent-specific dashboard
+    // Requirement 13.2: Create agent-specific dashboard
+    this.agentDashboard = new cloudwatch.Dashboard(this, 'AgentDashboard', {
+      dashboardName: 'CICADA-Agents',
+    });
+
+    // Create custom metrics namespace
+    const namespace = 'CICADA/Agents';
+
+    // Define agent names for metrics
+    const agents = [
+      { name: 'Orchestrator', function: agentStack.orchestratorAgentToolsFunction },
+      { name: 'Query', function: agentStack.queryAgentToolsFunction },
+      { name: 'Theory', function: agentStack.theoryAgentToolsFunction },
+      { name: 'Profile', function: agentStack.profileAgentToolsFunction },
+    ];
+
+    // Agent Invocation Count Widget
+    // Requirement 13.1: Add CloudWatch metrics for agent invocations
+    const invocationMetrics = agents.map(agent =>
+      new cloudwatch.Metric({
+        namespace,
+        metricName: 'AgentInvocationCount',
+        dimensionsMap: {
+          AgentName: agent.name,
+        },
+        statistic: 'Sum',
+        period: cdk.Duration.minutes(5),
+        label: `${agent.name} Invocations`,
+      })
+    );
+
+    this.agentDashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'Agent Invocations (5min)',
+        left: invocationMetrics,
+        width: 12,
+        height: 6,
+      })
+    );
+
+    // Agent Invocation Duration Widget
+    // Requirement 13.2: Emit metrics for latency
+    const durationMetrics = agents.map(agent =>
+      new cloudwatch.Metric({
+        namespace,
+        metricName: 'AgentInvocationDuration',
+        dimensionsMap: {
+          AgentName: agent.name,
+        },
+        statistic: 'Average',
+        period: cdk.Duration.minutes(5),
+        label: `${agent.name} Avg Duration`,
+        unit: cloudwatch.Unit.MILLISECONDS,
+      })
+    );
+
+    this.agentDashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'Agent Invocation Latency (ms)',
+        left: durationMetrics,
+        width: 12,
+        height: 6,
+      })
+    );
+
+    // Agent Error Rate Widget
+    // Requirement 13.3: Log detailed error information
+    const errorMetrics = agents.map(agent =>
+      new cloudwatch.Metric({
+        namespace,
+        metricName: 'AgentInvocationErrors',
+        dimensionsMap: {
+          AgentName: agent.name,
+        },
+        statistic: 'Sum',
+        period: cdk.Duration.minutes(5),
+        label: `${agent.name} Errors`,
+      })
+    );
+
+    this.agentDashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'Agent Invocation Errors (5min)',
+        left: errorMetrics,
+        width: 12,
+        height: 6,
+      })
+    );
+
+    // Token Usage Widget
+    // Requirement 13.2: Emit metrics for token usage
+    const tokenMetrics = agents.map(agent =>
+      new cloudwatch.Metric({
+        namespace,
+        metricName: 'AgentTokenUsage',
+        dimensionsMap: {
+          AgentName: agent.name,
+        },
+        statistic: 'Sum',
+        period: cdk.Duration.hours(1),
+        label: `${agent.name} Tokens`,
+      })
+    );
+
+    this.agentDashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'Token Usage by Agent (1hr)',
+        left: tokenMetrics,
+        width: 12,
+        height: 6,
+      })
+    );
+
+    // Agent Coordination Latency Widget
+    // Requirement 13.4: Trace the flow of requests across agents
+    const coordinationMetrics = [
+      new cloudwatch.Metric({
+        namespace,
+        metricName: 'AgentCoordinationLatency',
+        dimensionsMap: {
+          CoordinationType: 'Orchestrator-Query',
+        },
+        statistic: 'Average',
+        period: cdk.Duration.minutes(5),
+        label: 'Orchestrator → Query',
+        unit: cloudwatch.Unit.MILLISECONDS,
+      }),
+      new cloudwatch.Metric({
+        namespace,
+        metricName: 'AgentCoordinationLatency',
+        dimensionsMap: {
+          CoordinationType: 'Orchestrator-Theory',
+        },
+        statistic: 'Average',
+        period: cdk.Duration.minutes(5),
+        label: 'Orchestrator → Theory',
+        unit: cloudwatch.Unit.MILLISECONDS,
+      }),
+      new cloudwatch.Metric({
+        namespace,
+        metricName: 'AgentCoordinationLatency',
+        dimensionsMap: {
+          CoordinationType: 'Orchestrator-Profile',
+        },
+        statistic: 'Average',
+        period: cdk.Duration.minutes(5),
+        label: 'Orchestrator → Profile',
+        unit: cloudwatch.Unit.MILLISECONDS,
+      }),
+      new cloudwatch.Metric({
+        namespace,
+        metricName: 'AgentCoordinationLatency',
+        dimensionsMap: {
+          CoordinationType: 'Theory-Query',
+        },
+        statistic: 'Average',
+        period: cdk.Duration.minutes(5),
+        label: 'Theory → Query',
+        unit: cloudwatch.Unit.MILLISECONDS,
+      }),
+    ];
+
+    this.agentDashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'Agent Coordination Latency (ms)',
+        left: coordinationMetrics,
+        width: 12,
+        height: 6,
+      })
+    );
+
+    // Lambda Function Metrics for Agent Tools
+    const lambdaInvocations = agents.map(agent =>
+      agent.function.metricInvocations({
+        statistic: 'Sum',
+        period: cdk.Duration.minutes(5),
+        label: `${agent.name} Lambda Invocations`,
+      })
+    );
+
+    this.agentDashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'Agent Tools Lambda Invocations',
+        left: lambdaInvocations,
+        width: 12,
+        height: 6,
+      })
+    );
+
+    const lambdaErrors = agents.map(agent =>
+      agent.function.metricErrors({
+        statistic: 'Sum',
+        period: cdk.Duration.minutes(5),
+        label: `${agent.name} Lambda Errors`,
+      })
+    );
+
+    this.agentDashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'Agent Tools Lambda Errors',
+        left: lambdaErrors,
+        width: 12,
+        height: 6,
+      })
+    );
+
+    const lambdaDuration = agents.map(agent =>
+      agent.function.metricDuration({
+        statistic: 'Average',
+        period: cdk.Duration.minutes(5),
+        label: `${agent.name} Lambda Duration`,
+      })
+    );
+
+    this.agentDashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title: 'Agent Tools Lambda Duration (ms)',
+        left: lambdaDuration,
+        width: 12,
+        height: 6,
+      })
+    );
+
+    // Single Value Widgets for Key Metrics
+    this.agentDashboard.addWidgets(
+      new cloudwatch.SingleValueWidget({
+        title: 'Total Agent Invocations (24h)',
+        metrics: [
+          new cloudwatch.Metric({
+            namespace,
+            metricName: 'AgentInvocationCount',
+            statistic: 'Sum',
+            period: cdk.Duration.hours(24),
+          }),
+        ],
+        width: 6,
+        height: 3,
+      }),
+      new cloudwatch.SingleValueWidget({
+        title: 'Total Agent Errors (24h)',
+        metrics: [
+          new cloudwatch.Metric({
+            namespace,
+            metricName: 'AgentInvocationErrors',
+            statistic: 'Sum',
+            period: cdk.Duration.hours(24),
+          }),
+        ],
+        width: 6,
+        height: 3,
+      }),
+      new cloudwatch.SingleValueWidget({
+        title: 'Total Tokens Used (24h)',
+        metrics: [
+          new cloudwatch.Metric({
+            namespace,
+            metricName: 'AgentTokenUsage',
+            statistic: 'Sum',
+            period: cdk.Duration.hours(24),
+          }),
+        ],
+        width: 6,
+        height: 3,
+      }),
+      new cloudwatch.SingleValueWidget({
+        title: 'Avg Agent Latency (24h)',
+        metrics: [
+          new cloudwatch.Metric({
+            namespace,
+            metricName: 'AgentInvocationDuration',
+            statistic: 'Average',
+            period: cdk.Duration.hours(24),
+            unit: cloudwatch.Unit.MILLISECONDS,
+          }),
+        ],
+        width: 6,
+        height: 3,
+      })
+    );
+
+    // Create alarms for agent errors
+    // Requirement 13.5: Set up alarms for agent errors
+    if (this.alarmTopic) {
+      agents.forEach(agent => {
+        // Alarm for high error rate
+        const errorAlarm = new cloudwatch.Alarm(this, `${agent.name}AgentErrorAlarm`, {
+          alarmName: `CICADA-${agent.name}-Agent-Errors`,
+          alarmDescription: `Alert when ${agent.name} Agent has high error rate`,
+          metric: new cloudwatch.Metric({
+            namespace,
+            metricName: 'AgentInvocationErrors',
+            dimensionsMap: {
+              AgentName: agent.name,
+            },
+            statistic: 'Sum',
+            period: cdk.Duration.minutes(5),
+          }),
+          threshold: 5, // Alert if more than 5 errors in 5 minutes
+          evaluationPeriods: 1,
+          comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+          treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+        });
+
+        if (this.alarmTopic) {
+          errorAlarm.addAlarmAction(new actions.SnsAction(this.alarmTopic));
+        }
+
+        // Alarm for Lambda function errors
+        const lambdaErrorAlarm = agent.function.metricErrors({
+          statistic: 'Sum',
+          period: cdk.Duration.minutes(5),
+        }).createAlarm(this, `${agent.name}LambdaErrorAlarm`, {
+          alarmName: `CICADA-${agent.name}-Lambda-Errors`,
+          alarmDescription: `Alert when ${agent.name} Agent Lambda has errors`,
+          threshold: 3,
+          evaluationPeriods: 1,
+          comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+          treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+        });
+
+        if (this.alarmTopic) {
+          lambdaErrorAlarm.addAlarmAction(new actions.SnsAction(this.alarmTopic));
+        }
+
+        // Alarm for high latency
+        const latencyAlarm = new cloudwatch.Alarm(this, `${agent.name}AgentLatencyAlarm`, {
+          alarmName: `CICADA-${agent.name}-Agent-HighLatency`,
+          alarmDescription: `Alert when ${agent.name} Agent has high latency`,
+          metric: new cloudwatch.Metric({
+            namespace,
+            metricName: 'AgentInvocationDuration',
+            dimensionsMap: {
+              AgentName: agent.name,
+            },
+            statistic: 'Average',
+            period: cdk.Duration.minutes(5),
+            unit: cloudwatch.Unit.MILLISECONDS,
+          }),
+          threshold: 30000, // Alert if average latency > 30 seconds
+          evaluationPeriods: 2, // Must be high for 2 consecutive periods
+          comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+          treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+        });
+
+        if (this.alarmTopic) {
+          latencyAlarm.addAlarmAction(new actions.SnsAction(this.alarmTopic));
+        }
+      });
+    }
+
+    // Output agent dashboard URL
+    new cdk.CfnOutput(this, 'AgentDashboardURL', {
+      value: `https://console.aws.amazon.com/cloudwatch/home?region=${this.region}#dashboards:name=${this.agentDashboard.dashboardName}`,
+      description: 'Agent-specific CloudWatch Dashboard URL',
     });
   }
 }

@@ -13,12 +13,14 @@ import * as events from 'aws-cdk-lib/aws-events';
 import * as eventsTargets from 'aws-cdk-lib/aws-events-targets';
 import { Construct } from 'constructs';
 import { DataStack } from './data-stack';
+import { AgentStack } from './agent-stack';
 import * as path from 'path';
 
 export interface APIStackProps extends cdk.StackProps {
 
 
   dataStack: DataStack;
+  agentStack: AgentStack;
   authStack?: any; // Will be properly typed when AuthStack is imported
 }
 
@@ -141,6 +143,15 @@ export class APIStack extends cdk.Stack {
         KNOWLEDGE_BASE_BUCKET: props.dataStack.knowledgeBaseBucket.bucketName,
         WEBSOCKET_DOMAIN_NAME: `${this.webSocketApi.apiId}.execute-api.${this.region}.amazonaws.com`,
         WEBSOCKET_STAGE: this.webSocketStage.stageName,
+        // AgentCore agent IDs for invocation
+        ORCHESTRATOR_AGENT_ID: props.agentStack.orchestratorAgent.attrAgentId,
+        ORCHESTRATOR_AGENT_ALIAS_ID: props.agentStack.orchestratorAgentAlias.attrAgentAliasId,
+        QUERY_AGENT_ID: props.agentStack.queryAgent.attrAgentId,
+        QUERY_AGENT_ALIAS_ID: props.agentStack.queryAgentAlias.attrAgentAliasId,
+        THEORY_AGENT_ID: props.agentStack.theoryAgent.attrAgentId,
+        THEORY_AGENT_ALIAS_ID: props.agentStack.theoryAgentAlias.attrAgentAliasId,
+        PROFILE_AGENT_ID: props.agentStack.profileAgent.attrAgentId,
+        PROFILE_AGENT_ALIAS_ID: props.agentStack.profileAgentAlias.attrAgentAliasId,
       },
       bundling: {
         externalModules: ['@aws-sdk/*'],
@@ -163,6 +174,18 @@ export class APIStack extends cdk.Stack {
         effect: iam.Effect.ALLOW,
         actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'],
         resources: ['*'],
+      })
+    );
+
+    // Grant permission to invoke AgentCore agents
+    messageProcessor.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['bedrock:InvokeAgent'],
+        resources: [
+          `arn:aws:bedrock:${this.region}:${this.account}:agent/*`,
+          `arn:aws:bedrock:${this.region}:${this.account}:agent-alias/*`,
+        ],
       })
     );
 

@@ -80,7 +80,7 @@ f - [x] 5. Implement Query Agent with AgentCore
   - Test multi-hop agent invocation
   - _Requirements: 2.3, 7.2_
 
-- [ ] 9. Implement Profile Agent with AgentCore
+- [x] 9. Implement Profile Agent with AgentCore
   - Create Profile Agent definition in CDK
   - Write agent instructions for knowledge extraction
   - Define tools for profile CRUD operations, information extraction
@@ -88,18 +88,18 @@ f - [x] 5. Implement Query Agent with AgentCore
   - Configure foundation model (streaming disabled for transactional operations)
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
 
-- [ ] 9.1 Write property test for profile update consistency
+- [x] 9.1 Write property test for profile update consistency
   - **Property 5: Profile Update Consistency**
   - **Validates: Requirements 5.3, 5.4, 9.4**
 
-- [ ] 10. Configure Orchestrator to invoke Profile Agent
+- [x] 10. Configure Orchestrator to invoke Profile Agent
   - Add invokeProfileAgent tool to Orchestrator
   - Implement tool handler that calls Profile Agent via BedrockAgentRuntime
   - Configure permissions for Orchestrator → Profile Agent invocation
   - Test profile extraction and updates through agent coordination
   - _Requirements: 2.3, 7.2_
 
-- [ ] 11. Implement error handling and retry logic
+- [x] 11. Implement error handling and retry logic
   - Create AgentInvocationError class
   - Implement retry logic with exponential backoff
   - Add error handling for streaming interruptions
@@ -107,11 +107,11 @@ f - [x] 5. Implement Query Agent with AgentCore
   - Add comprehensive error logging
   - _Requirements: 7.3_
 
-- [ ] 11.1 Write property test for error recovery
+- [x] 11.1 Write property test for error recovery
   - **Property 6: Error Recovery**
   - **Validates: Requirements 7.3**
 
-- [ ] 12. Update environment variables and configuration
+- [x] 12. Update environment variables and configuration
   - Add ORCHESTRATOR_AGENT_ID to environment
   - Add ORCHESTRATOR_AGENT_ALIAS_ID to environment
   - Add QUERY_AGENT_ID, THEORY_AGENT_ID, PROFILE_AGENT_ID
@@ -119,14 +119,14 @@ f - [x] 5. Implement Query Agent with AgentCore
   - Update .env.nonprod and .env.prod files
   - _Requirements: 10.4_
 
-- [ ] 13. Checkpoint - Test agent coordination end-to-end
+- [x] 13. Checkpoint - Test agent coordination end-to-end
   - Verify Orchestrator can invoke all specialized agents
   - Test streaming responses work correctly
   - Verify citations are preserved
   - Test profile updates work correctly
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 14. Implement monitoring and observability
+- [x] 14. Implement monitoring and observability
   - Add CloudWatch metrics for agent invocations
   - Create agent-specific dashboard
   - Implement structured logging for agent calls
@@ -134,22 +134,22 @@ f - [x] 5. Implement Query Agent with AgentCore
   - Set up alarms for agent errors
   - _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5_
 
-- [ ] 15. Run all existing property-based tests
+- [x] 15. Run all existing property-based tests
   - Run all 30 property test suites
   - Verify all correctness properties still hold
   - Fix any regressions discovered
   - Document any behavioral changes
   - _Requirements: 9.5, 11.1, 11.2, 11.3_
 
-- [ ] 15.1 Write property test for cost efficiency
+- [x] 15.1 Write property test for cost efficiency
   - **Property 7: Cost Efficiency**
   - **Validates: Requirements 15.1, 15.2**
 
-- [ ] 15.2 Write property test for response time consistency
+- [x] 15.2 Write property test for response time consistency
   - **Property 8: Response Time Consistency**
   - **Validates: Requirements 8.1, 8.5**
 
-- [ ] 16. Update integration tests for AgentCore
+- [x] 16. Update integration tests for AgentCore
   - Update test/integration/orchestrator.test.ts for AgentCore
   - Update test/integration/knowledge-base.test.ts if needed
   - Add integration tests for agent-to-agent invocation

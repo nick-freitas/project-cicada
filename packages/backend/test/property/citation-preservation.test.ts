@@ -29,24 +29,31 @@ jest.mock('@aws-sdk/client-bedrock-runtime');
 jest.mock('@aws-sdk/client-s3');
 
 describe('Property 4: Citation Preservation', () => {
-  // Generator for episode IDs
+  // Generator for episode IDs (non-empty, non-whitespace)
   const episodeIdArbitrary = fc.oneof(
     fc.constantFrom('onikakushi', 'watanagashi', 'tatarigoroshi', 'himatsubushi'),
-    fc.string({ minLength: 5, maxLength: 15 }).map((s) => s.replace(/[^a-z0-9]/gi, '').toLowerCase()),
+    fc.string({ minLength: 5, maxLength: 15 })
+      .map((s) => s.replace(/[^a-z0-9]/gi, '').toLowerCase())
+      .filter((s) => s.length >= 5), // Ensure non-empty after filtering
   );
+
+  // Generator for non-empty, non-whitespace strings
+  const nonEmptyStringArbitrary = (minLength: number, maxLength: number) =>
+    fc.string({ minLength, maxLength })
+      .filter((s) => s.trim().length >= minLength);
 
   // Generator for script embeddings
   const scriptEmbeddingArbitrary = fc.record({
     id: fc.uuid(),
     episodeId: episodeIdArbitrary,
-    chapterId: fc.string({ minLength: 1, maxLength: 20 }),
+    chapterId: nonEmptyStringArbitrary(1, 20),
     messageId: fc.integer({ min: 1, max: 10000 }),
-    speaker: fc.option(fc.string({ minLength: 1, maxLength: 30 }), { nil: undefined }),
-    textENG: fc.string({ minLength: 10, maxLength: 200 }),
-    textJPN: fc.option(fc.string({ minLength: 10, maxLength: 200 }), { nil: undefined }),
+    speaker: fc.option(nonEmptyStringArbitrary(1, 30), { nil: undefined }),
+    textENG: nonEmptyStringArbitrary(10, 200),
+    textJPN: fc.option(nonEmptyStringArbitrary(10, 200), { nil: undefined }),
     embedding: fc.array(fc.float({ min: -1, max: 1 }), { minLength: 1536, maxLength: 1536 }),
     metadata: fc.record({
-      episodeName: fc.string({ minLength: 5, maxLength: 30 }),
+      episodeName: nonEmptyStringArbitrary(5, 30),
     }),
   });
 

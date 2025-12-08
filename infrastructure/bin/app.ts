@@ -36,6 +36,7 @@ const authStack = new AuthStack(app, 'ProjectCICADAAuthStack', {
 const apiStack = new APIStack(app, 'ProjectCICADAAPIStack', {
   env,
   dataStack,
+  agentStack,
   authStack,
 });
 

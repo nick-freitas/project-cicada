@@ -3,6 +3,12 @@ import {
   InvokeAgentCommand,
 } from '@aws-sdk/client-bedrock-agent-runtime';
 import { logger } from '../../utils/logger';
+import {
+  invokeAgentWithRetry,
+  processStreamWithErrorHandling,
+  getUserFriendlyErrorMessage,
+} from '../../utils/agent-invocation';
+import { AgentInvocationError } from '../../types/agentcore';
 
 const bedrockAgentClient = new BedrockAgentRuntimeClient({ 
   region: process.env.AWS_REGION || 'us-east-1' 
@@ -74,28 +80,41 @@ export async function invokeQueryAgent(
       inputText += `\n\nCharacter Focus: ${input.characterFocus}`;
     }
 
-    // Invoke Query Agent via BedrockAgentRuntime
-    const command = new InvokeAgentCommand({
-      agentId: queryAgentId,
-      agentAliasId: queryAgentAliasId,
-      sessionId: `query-${sessionId}`, // Unique session for Query Agent
-      inputText,
-      enableTrace: false, // Disable trace for agent-to-agent calls to reduce overhead
-    });
-
-    const response = await bedrockAgentClient.send(command);
-
-    // Collect the complete response from the stream
-    let completeResponse = '';
-    
-    if (response.completion) {
-      for await (const chunk of response.completion) {
-        if (chunk.chunk?.bytes) {
-          const text = new TextDecoder().decode(chunk.chunk.bytes);
-          completeResponse += text;
-        }
+    // Invoke Query Agent via BedrockAgentRuntime with retry logic
+    // Requirement 7.3: Implement retry logic with exponential backoff
+    const response = await invokeAgentWithRetry(
+      bedrockAgentClient,
+      {
+        agentId: queryAgentId,
+        agentAliasId: queryAgentAliasId,
+        sessionId: `query-${sessionId}`, // Unique session for Query Agent
+        inputText,
+        enableTrace: false, // Disable trace for agent-to-agent calls to reduce overhead
+      },
+      'Query',
+      {
+        maxRetries: 3,
+        retryDelay: 1000,
+        timeout: 45000, // Shorter timeout for agent-to-agent calls
       }
+    );
+
+    // Collect the complete response from the stream with error handling
+    // Requirement 7.3: Add error handling for streaming interruptions
+    if (!response.completion) {
+      throw new Error('No completion stream received from Query Agent');
     }
+
+    const completeResponse = await processStreamWithErrorHandling(
+      response.completion,
+      async () => {}, // No per-chunk processing needed for agent-to-agent calls
+      async (error: Error) => {
+        logger.error('Query Agent streaming error', {
+          error: error.message,
+          sessionId,
+        });
+      }
+    );
 
     logger.info('Query Agent invocation completed', {
       responseLength: completeResponse.length,
@@ -104,8 +123,27 @@ export async function invokeQueryAgent(
 
     return completeResponse;
   } catch (error) {
-    logger.error('Error invoking Query Agent', { error, input, sessionId });
-    throw new Error(`Failed to invoke Query Agent: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    // Requirement 7.3: Add comprehensive error logging
+    // Property 6: Error Recovery - graceful error handling
+    logger.error('Error invoking Query Agent', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      errorType: error instanceof AgentInvocationError ? 'AgentInvocationError' : error?.constructor?.name,
+      retryable: error instanceof AgentInvocationError ? error.retryable : false,
+      input,
+      sessionId,
+    });
+
+    // Re-throw AgentInvocationError as-is, wrap other errors
+    if (error instanceof AgentInvocationError) {
+      throw error;
+    }
+
+    throw new AgentInvocationError(
+      `Failed to invoke Query Agent: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      'Query',
+      false,
+      error instanceof Error ? error : undefined
+    );
   }
 }
 
@@ -145,28 +183,41 @@ export async function invokeTheoryAgent(
       inputText += '\n\nPlease provide theory refinement suggestions.';
     }
 
-    // Invoke Theory Agent via BedrockAgentRuntime
-    const command = new InvokeAgentCommand({
-      agentId: theoryAgentId,
-      agentAliasId: theoryAgentAliasId,
-      sessionId: `theory-${sessionId}`,
-      inputText,
-      enableTrace: false,
-    });
-
-    const response = await bedrockAgentClient.send(command);
-
-    // Collect the complete response from the stream
-    let completeResponse = '';
-    
-    if (response.completion) {
-      for await (const chunk of response.completion) {
-        if (chunk.chunk?.bytes) {
-          const text = new TextDecoder().decode(chunk.chunk.bytes);
-          completeResponse += text;
-        }
+    // Invoke Theory Agent via BedrockAgentRuntime with retry logic
+    // Requirement 7.3: Implement retry logic with exponential backoff
+    const response = await invokeAgentWithRetry(
+      bedrockAgentClient,
+      {
+        agentId: theoryAgentId,
+        agentAliasId: theoryAgentAliasId,
+        sessionId: `theory-${sessionId}`,
+        inputText,
+        enableTrace: false,
+      },
+      'Theory',
+      {
+        maxRetries: 3,
+        retryDelay: 1000,
+        timeout: 45000,
       }
+    );
+
+    // Collect the complete response from the stream with error handling
+    // Requirement 7.3: Add error handling for streaming interruptions
+    if (!response.completion) {
+      throw new Error('No completion stream received from Theory Agent');
     }
+
+    const completeResponse = await processStreamWithErrorHandling(
+      response.completion,
+      async () => {},
+      async (error: Error) => {
+        logger.error('Theory Agent streaming error', {
+          error: error.message,
+          sessionId,
+        });
+      }
+    );
 
     logger.info('Theory Agent invocation completed', {
       responseLength: completeResponse.length,
@@ -175,8 +226,27 @@ export async function invokeTheoryAgent(
 
     return completeResponse;
   } catch (error) {
-    logger.error('Error invoking Theory Agent', { error, input, sessionId });
-    throw new Error(`Failed to invoke Theory Agent: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    // Requirement 7.3: Add comprehensive error logging
+    // Property 6: Error Recovery - graceful error handling
+    logger.error('Error invoking Theory Agent', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      errorType: error instanceof AgentInvocationError ? 'AgentInvocationError' : error?.constructor?.name,
+      retryable: error instanceof AgentInvocationError ? error.retryable : false,
+      input,
+      sessionId,
+    });
+
+    // Re-throw AgentInvocationError as-is, wrap other errors
+    if (error instanceof AgentInvocationError) {
+      throw error;
+    }
+
+    throw new AgentInvocationError(
+      `Failed to invoke Theory Agent: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      'Theory',
+      false,
+      error instanceof Error ? error : undefined
+    );
   }
 }
 
@@ -211,28 +281,41 @@ export async function invokeProfileAgent(
       inputText += `\n\nExtraction Mode: ${input.extractionMode}`;
     }
 
-    // Invoke Profile Agent via BedrockAgentRuntime
-    const command = new InvokeAgentCommand({
-      agentId: profileAgentId,
-      agentAliasId: profileAgentAliasId,
-      sessionId: `profile-${sessionId}`,
-      inputText,
-      enableTrace: false,
-    });
-
-    const response = await bedrockAgentClient.send(command);
-
-    // Collect the complete response from the stream
-    let completeResponse = '';
-    
-    if (response.completion) {
-      for await (const chunk of response.completion) {
-        if (chunk.chunk?.bytes) {
-          const text = new TextDecoder().decode(chunk.chunk.bytes);
-          completeResponse += text;
-        }
+    // Invoke Profile Agent via BedrockAgentRuntime with retry logic
+    // Requirement 7.3: Implement retry logic with exponential backoff
+    const response = await invokeAgentWithRetry(
+      bedrockAgentClient,
+      {
+        agentId: profileAgentId,
+        agentAliasId: profileAgentAliasId,
+        sessionId: `profile-${sessionId}`,
+        inputText,
+        enableTrace: false,
+      },
+      'Profile',
+      {
+        maxRetries: 3,
+        retryDelay: 1000,
+        timeout: 45000,
       }
+    );
+
+    // Collect the complete response from the stream with error handling
+    // Requirement 7.3: Add error handling for streaming interruptions
+    if (!response.completion) {
+      throw new Error('No completion stream received from Profile Agent');
     }
+
+    const completeResponse = await processStreamWithErrorHandling(
+      response.completion,
+      async () => {},
+      async (error: Error) => {
+        logger.error('Profile Agent streaming error', {
+          error: error.message,
+          sessionId,
+        });
+      }
+    );
 
     logger.info('Profile Agent invocation completed', {
       responseLength: completeResponse.length,
@@ -241,8 +324,27 @@ export async function invokeProfileAgent(
 
     return completeResponse;
   } catch (error) {
-    logger.error('Error invoking Profile Agent', { error, input, sessionId });
-    throw new Error(`Failed to invoke Profile Agent: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    // Requirement 7.3: Add comprehensive error logging
+    // Property 6: Error Recovery - graceful error handling
+    logger.error('Error invoking Profile Agent', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      errorType: error instanceof AgentInvocationError ? 'AgentInvocationError' : error?.constructor?.name,
+      retryable: error instanceof AgentInvocationError ? error.retryable : false,
+      input,
+      sessionId,
+    });
+
+    // Re-throw AgentInvocationError as-is, wrap other errors
+    if (error instanceof AgentInvocationError) {
+      throw error;
+    }
+
+    throw new AgentInvocationError(
+      `Failed to invoke Profile Agent: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      'Profile',
+      false,
+      error instanceof Error ? error : undefined
+    );
   }
 }
 

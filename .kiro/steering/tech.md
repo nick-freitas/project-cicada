@@ -1,14 +1,48 @@
 # Technology Stack
 
+## ⚠️ CRITICAL: Package Management - READ THIS FIRST ⚠️
+
+### 🚨 MANDATORY: USE `pnpm` ONLY - NEVER USE `npm` OR `yarn` 🚨
+
+**THIS IS NON-NEGOTIABLE. USING `npm` WILL BREAK THE PROJECT.**
+
+- ❌ **NEVER EVER use `npm`** - it WILL cause dependency conflicts and break the monorepo
+- ❌ **NEVER use `yarn`** - this project is configured for pnpm only
+- ✅ **ALWAYS use `pnpm`** for ALL package management operations
+
+### Command Translation Table (MEMORIZE THIS):
+
+| ❌ WRONG (npm)      | ✅ CORRECT (pnpm)     |
+|---------------------|----------------------|
+| `npm install`       | `pnpm install`       |
+| `npm test`          | `pnpm test`          |
+| `npm run build`     | `pnpm run build`     |
+| `npm run dev`       | `pnpm run dev`       |
+| `npm ci`            | `pnpm install --frozen-lockfile` |
+
+### Why pnpm?
+- **Monorepo**: This project uses pnpm workspaces for monorepo management
+- **Efficiency**: pnpm is faster and uses less disk space than npm
+- **Consistency**: All team members and CI/CD use pnpm
+- **Lock file**: We use `pnpm-lock.yaml`, NOT `package-lock.json`
+
+### Before Running ANY Command:
+1. Check you're using `pnpm` (not `npm`)
+2. If you see `npm` in a command, replace it with `pnpm`
+3. When in doubt, use `pnpm`
+
 ## Language & Type System
+
+### 🚨 MANDATORY: USE `pnpm` ONLY - NEVER USE `npm` OR `yarn` 🚨
+
+**THIS IS NON-NEGOTIABLE. USING `npm` WILL BREAK THE PROJECT.**
+
+- ❌ **NEVER EVER use `npm`** - it WILL cause dependency conflicts and break the monorepo
+- ❌ **NEVER use `yarn`** - this project is configured for pnpm only
+- ✅ **ALWAYS use `pnpm`** for ALL package management operations
 
 - **TypeScript**: All code (frontend, backend, infrastructure) uses TypeScript with strict type checking
 - **Shared Types**: Common types package shared across frontend and backend
-
-## Package Management
-
-- **pnpm**: Use pnpm for all package management (faster, more efficient than npm)
-- **Workspaces**: Monorepo managed with pnpm workspaces
 
 ## Frontend
 
@@ -51,6 +85,14 @@
 - **Evaluation**: AWS Evals for model performance
 
 ## Common Commands
+
+### 🚨 MANDATORY: USE `pnpm` ONLY - NEVER USE `npm` OR `yarn` 🚨
+
+**THIS IS NON-NEGOTIABLE. USING `npm` WILL BREAK THE PROJECT.**
+
+- ❌ **NEVER EVER use `npm`** - it WILL cause dependency conflicts and break the monorepo
+- ❌ **NEVER use `yarn`** - this project is configured for pnpm only
+- ✅ **ALWAYS use `pnpm`** for ALL package management operations
 
 ### Frontend
 ```bash
@@ -120,6 +162,14 @@ pnpm test
 
 ## Architecture Patterns
 
+### 🚨 MANDATORY: USE `pnpm` ONLY - NEVER USE `npm` OR `yarn` 🚨
+
+**THIS IS NON-NEGOTIABLE. USING `npm` WILL BREAK THE PROJECT.**
+
+- ❌ **NEVER EVER use `npm`** - it WILL cause dependency conflicts and break the monorepo
+- ❌ **NEVER use `yarn`** - this project is configured for pnpm only
+- ✅ **ALWAYS use `pnpm`** for ALL package management operations
+
 - **Serverless**: All compute is Lambda-based for cost optimization
 - **Event-Driven**: EventBridge and SQS for decoupled async processing
 - **Multi-Agent**: Specialized agents (Query, Theory, Profile) coordinated by Orchestrator
@@ -143,3 +193,12 @@ When deploying infrastructure changes:
 3. **Use `cdk diff`** before deploying to review changes
 4. **Deploy all stacks** only when necessary: `cdk deploy --all`
 5. **Stack dependencies** are managed automatically by CDK
+
+
+### 🚨 MANDATORY: USE `pnpm` ONLY - NEVER USE `npm` OR `yarn` 🚨
+
+**THIS IS NON-NEGOTIABLE. USING `npm` WILL BREAK THE PROJECT.**
+
+- ❌ **NEVER EVER use `npm`** - it WILL cause dependency conflicts and break the monorepo
+- ❌ **NEVER use `yarn`** - this project is configured for pnpm only
+- ✅ **ALWAYS use `pnpm`** for ALL package management operations

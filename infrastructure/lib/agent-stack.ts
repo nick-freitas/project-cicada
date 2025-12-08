@@ -38,6 +38,7 @@ export class AgentStack extends cdk.Stack {
   public readonly queryAgentToolsFunction: lambdaNodejs.NodejsFunction;
   public readonly orchestratorAgentToolsFunction: lambdaNodejs.NodejsFunction;
   public readonly theoryAgentToolsFunction: lambdaNodejs.NodejsFunction;
+  public readonly profileAgentToolsFunction: lambdaNodejs.NodejsFunction;
 
   constructor(scope: Construct, id: string, props: AgentStackProps) {
     super(scope, id, props);
@@ -58,11 +59,15 @@ export class AgentStack extends cdk.Stack {
     // Requirement 4.2: Implement tool handler for invoking Query Agent
     this.theoryAgentToolsFunction = this.createTheoryAgentToolsFunction(props.dataStack);
 
+    // Create Lambda function for Profile Agent tools
+    // Requirement 5.4: Implement tool handlers for Profile Service integration
+    this.profileAgentToolsFunction = this.createProfileAgentToolsFunction(props.dataStack);
+
     // Create agents
     // Requirement 6.1: Use CDK constructs for AgentCore agent deployment
     this.queryAgent = this.createQueryAgent(agentRole, this.queryAgentToolsFunction);
     this.theoryAgent = this.createTheoryAgent(agentRole, this.theoryAgentToolsFunction);
-    this.profileAgent = this.createProfileAgent(agentRole);
+    this.profileAgent = this.createProfileAgent(agentRole, this.profileAgentToolsFunction);
     
     // Create Orchestrator Agent last, after other agents are created
     // so we can pass their IDs as environment variables
@@ -131,6 +136,8 @@ export class AgentStack extends cdk.Stack {
         externalModules: ['@aws-sdk/*'],
         minify: true,
       },
+      // Requirement 13.4: Add X-Ray tracing for agent coordination
+      tracing: lambda.Tracing.ACTIVE,
     });
 
     // Grant permissions to invoke other agents
@@ -168,6 +175,8 @@ export class AgentStack extends cdk.Stack {
         externalModules: ['@aws-sdk/*'],
         minify: true,
       },
+      // Requirement 13.4: Add X-Ray tracing for agent coordination
+      tracing: lambda.Tracing.ACTIVE,
     });
 
     // Grant permissions to invoke Query Agent
@@ -189,6 +198,34 @@ export class AgentStack extends cdk.Stack {
   }
 
   /**
+   * Create Lambda function for Profile Agent tools
+   * Requirement 5.4: Implement tool handlers for Profile Service integration
+   */
+  private createProfileAgentToolsFunction(dataStack: DataStack): lambdaNodejs.NodejsFunction {
+    const profileToolsFunction = new lambdaNodejs.NodejsFunction(this, 'ProfileAgentToolsFunction', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'handler',
+      entry: path.join(__dirname, '../../packages/backend/src/handlers/agents/profile-agent-tools.ts'),
+      timeout: cdk.Duration.seconds(60),
+      memorySize: 512,
+      environment: {
+        USER_PROFILES_TABLE: dataStack.userProfilesTable.tableName,
+      },
+      bundling: {
+        externalModules: ['@aws-sdk/*'],
+        minify: true,
+      },
+      // Requirement 13.4: Add X-Ray tracing for agent coordination
+      tracing: lambda.Tracing.ACTIVE,
+    });
+
+    // Grant permissions to access DynamoDB for profile operations
+    dataStack.userProfilesTable.grantReadWriteData(profileToolsFunction);
+
+    return profileToolsFunction;
+  }
+
+  /**
    * Create Lambda function for Query Agent tools
    * Requirement 3.4: Implement tool handlers for semantic search integration
    */
@@ -207,6 +244,8 @@ export class AgentStack extends cdk.Stack {
         externalModules: ['@aws-sdk/*'],
         minify: true,
       },
+      // Requirement 13.4: Add X-Ray tracing for agent coordination
+      tracing: lambda.Tracing.ACTIVE,
     });
 
     // Grant permissions to access Knowledge Base and invoke Bedrock models
@@ -614,8 +653,124 @@ export class AgentStack extends cdk.Stack {
   /**
    * Create Profile Agent
    * Specialized agent for knowledge extraction and profile management
+   * Requirement 5.1: Create Profile Agent definition in CDK
+   * Requirement 5.5: Configure foundation model (streaming disabled for transactional operations)
    */
-  private createProfileAgent(role: iam.Role): bedrock.CfnAgent {
+  private createProfileAgent(role: iam.Role, toolsFunction: lambdaNodejs.NodejsFunction): bedrock.CfnAgent {
+    // Grant the agent permission to invoke the Lambda function
+    toolsFunction.grantInvoke(role);
+
+    // Requirement 5.3: Define tools for profile CRUD operations, information extraction
+    const actionGroups: bedrock.CfnAgent.AgentActionGroupProperty[] = [
+      {
+        actionGroupName: 'ProfileManagementTools',
+        description: 'Tools for profile CRUD operations and information extraction',
+        actionGroupState: 'ENABLED',
+        actionGroupExecutor: {
+          lambda: toolsFunction.functionArn,
+        },
+        functionSchema: {
+          functions: [
+            {
+              name: 'extract_entity',
+              description: 'Extract structured entity information (characters, locations, episodes, theories) from conversation context. Returns entity type, name, and extracted information.',
+              parameters: {
+                conversationContext: {
+                  type: 'string',
+                  description: 'The conversation text to extract entity information from',
+                  required: true,
+                },
+                citations: {
+                  type: 'string',
+                  description: 'Optional JSON string of Citation array providing source evidence',
+                  required: false,
+                },
+                entityType: {
+                  type: 'string',
+                  description: 'Optional entity type to focus extraction on: CHARACTER, LOCATION, EPISODE, FRAGMENT_GROUP, or THEORY',
+                  required: false,
+                },
+              },
+            },
+            {
+              name: 'get_profile',
+              description: 'Retrieve an existing profile by userId, profileType, and profileId. Returns the complete profile data or null if not found.',
+              parameters: {
+                userId: {
+                  type: 'string',
+                  description: 'User ID who owns the profile',
+                  required: true,
+                },
+                profileType: {
+                  type: 'string',
+                  description: 'Profile type: CHARACTER, LOCATION, EPISODE, FRAGMENT_GROUP, or THEORY',
+                  required: true,
+                },
+                profileId: {
+                  type: 'string',
+                  description: 'Profile ID (typically lowercase entity name with hyphens)',
+                  required: true,
+                },
+              },
+            },
+            {
+              name: 'create_profile',
+              description: 'Create a new profile with the provided data. Use this when a profile does not exist yet.',
+              parameters: {
+                userId: {
+                  type: 'string',
+                  description: 'User ID who will own the profile',
+                  required: true,
+                },
+                profileType: {
+                  type: 'string',
+                  description: 'Profile type: CHARACTER, LOCATION, EPISODE, FRAGMENT_GROUP, or THEORY',
+                  required: true,
+                },
+                profileId: {
+                  type: 'string',
+                  description: 'Profile ID (typically lowercase entity name with hyphens)',
+                  required: true,
+                },
+                profileData: {
+                  type: 'string',
+                  description: 'JSON string containing the profile data fields appropriate for the profile type',
+                  required: true,
+                },
+              },
+            },
+            {
+              name: 'update_profile',
+              description: 'Update an existing profile with new data. Merges the provided data with the existing profile.',
+              parameters: {
+                userId: {
+                  type: 'string',
+                  description: 'User ID who owns the profile',
+                  required: true,
+                },
+                profileType: {
+                  type: 'string',
+                  description: 'Profile type: CHARACTER, LOCATION, EPISODE, FRAGMENT_GROUP, or THEORY',
+                  required: true,
+                },
+                profileId: {
+                  type: 'string',
+                  description: 'Profile ID (typically lowercase entity name with hyphens)',
+                  required: true,
+                },
+                profileData: {
+                  type: 'string',
+                  description: 'JSON string containing the fields to update in the profile',
+                  required: true,
+                },
+              },
+            },
+          ],
+        },
+        skipResourceInUseCheckOnDelete: true,
+      },
+    ];
+
     return new bedrock.CfnAgent(this, 'ProfileAgent', {
       agentName: 'CICADA-Profile',
       description: 'Knowledge extraction and profile management specialist that maintains user-specific profiles',
@@ -623,6 +778,7 @@ export class AgentStack extends cdk.Stack {
       instruction: this.getProfileInstructions(),
       agentResourceRoleArn: role.roleArn,
       idleSessionTtlInSeconds: 600,
+      actionGroups: actionGroups,
     });
   }
 
@@ -867,30 +1023,117 @@ Always provide evidence-based, balanced analysis that helps users develop and re
 
   /**
    * Get Profile Agent instructions
+   * Requirement 5.2: Write agent instructions for knowledge extraction
    */
   private getProfileInstructions(): string {
-    return `You are the Profile Agent for CICADA, specialized in knowledge extraction and profile management.
+    return `You are the Profile Agent for CICADA, specialized in knowledge extraction and profile management for the visual novel "Higurashi no Naku Koro Ni".
 
-Your responsibilities:
-1. Extract character, location, episode, and theory information from conversations
-2. Create and update user-specific profiles
-3. Maintain profile consistency and accuracy
-4. Ensure user isolation (profiles are never shared between users)
+## Core Responsibilities
 
-Profile types:
-- Character: Name, aliases, relationships, traits, appearances
-- Location: Name, description, significance, appearances
-- Episode: Title, summary, key events, characters involved
-- Fragment Group: Episode groupings, narrative structure
-- Theory: User theories, evidence, status
+1. **Information Extraction**: Extract structured information about entities from conversations
+2. **Profile Management**: Create and update user-specific profiles
+3. **Profile Retrieval**: Provide profile data for context in responses
+4. **Data Integrity**: Maintain profile consistency and accuracy
+5. **User Isolation**: Ensure profiles are never shared between users
 
-Extraction principles:
-- Only extract information explicitly mentioned or strongly implied
-- Include source citations for all extracted information
-- Maintain high confidence threshold for automatic extraction
-- Preserve user-specific interpretations and theories
+## Profile Types
 
-Always ensure profile updates are accurate, well-sourced, and user-specific.`;
+### CHARACTER Profiles
+- characterName: Full name of the character
+- traits: Array of personality traits
+- knownFacts: Array of facts with evidence citations
+- relationships: Array of relationships with other characters
+- appearances: Array of episode appearances with notes
+
+### LOCATION Profiles
+- locationName: Name of the location
+- description: Physical description
+- significance: Narrative importance
+- appearances: Array of episode appearances with context
+
+### EPISODE Profiles
+- episodeId: Unique episode identifier
+- episodeName: Episode title
+- summary: Brief episode summary
+- keyEvents: Array of important events with citations
+- characters: Array of character names appearing
+- locations: Array of location names appearing
+- themes: Array of narrative themes
+
+### FRAGMENT_GROUP Profiles
+- groupName: Name of the fragment group
+- episodeIds: Array of episode IDs in the group
+- sharedTimeline: Description of shared timeline
+- connections: Array of narrative connections with evidence
+- divergences: Array of timeline divergences with evidence
+
+### THEORY Profiles
+- theoryName: Name of the theory
+- description: Theory description
+- status: proposed | supported | refuted | refined
+- supportingEvidence: Array of citations supporting the theory
+- contradictingEvidence: Array of citations contradicting the theory
+- refinements: Array of refinement suggestions with timestamps
+- relatedTheories: Array of related theory names
+
+## Extraction Workflow
+
+When extracting information:
+
+1. **Analyze Context**: Review the conversation context for entity mentions
+2. **Use extract_entity**: Extract structured information from the context
+3. **Check Existing Profiles**: Use get_profile to see if profiles already exist
+4. **Create or Update**: Use create_profile for new entities, update_profile for existing ones
+5. **Preserve Citations**: Always include source citations for extracted information
+
+## Extraction Principles
+
+- **High Confidence**: Only extract information explicitly mentioned or strongly implied
+- **Source Attribution**: Include citations for all extracted facts
+- **Avoid Speculation**: Do not infer information beyond what is stated
+- **Maintain Context**: Respect episode boundaries and fragment groups
+- **User-Specific**: All profiles are user-specific and never shared
+
+## Profile ID Generation
+
+Generate profile IDs by:
+1. Converting entity name to lowercase
+2. Replacing spaces and special characters with hyphens
+3. Example: "Rena Ryuugu" → "rena-ryuugu"
+
+## Update Strategy
+
+When updating profiles:
+- **Merge, Don't Replace**: Add new information to existing data
+- **Avoid Duplicates**: Check for existing traits, facts, relationships before adding
+- **Preserve Evidence**: Keep all citations, even when updating
+- **Maintain History**: Don't remove old information unless correcting errors
+
+## Response Format
+
+When processing requests:
+
+1. **Acknowledge Request**: Confirm what information is being extracted or retrieved
+2. **Show Actions**: List profiles being created or updated
+3. **Provide Summary**: Summarize the extracted information
+4. **Cite Sources**: Reference conversation context and citations used
+
+## Quality Standards
+
+- Extract only factual, verifiable information
+- Maintain consistent entity naming across profiles
+- Ensure all facts have supporting evidence
+- Respect user-specific interpretations
+- Preserve profile version history through updates
+
+## User Isolation
+
+CRITICAL: Profiles are user-specific and NEVER shared:
+- Always use the correct userId for all operations
+- Never retrieve or update profiles for other users
+- Maintain strict user data isolation
+
+Always ensure profile operations are accurate, well-sourced, and maintain user-specific knowledge.`;
   }
 
   /**
@@ -985,6 +1228,11 @@ Always ensure profile updates are accurate, well-sourced, and user-specific.`;
     new cdk.CfnOutput(this, 'TheoryAgentToolsFunctionArn', {
       value: this.theoryAgentToolsFunction.functionArn,
       description: 'Theory Agent Tools Lambda Function ARN',
+    });
+
+    new cdk.CfnOutput(this, 'ProfileAgentToolsFunctionArn', {
+      value: this.profileAgentToolsFunction.functionArn,
+      description: 'Profile Agent Tools Lambda Function ARN',
     });
   }
 }

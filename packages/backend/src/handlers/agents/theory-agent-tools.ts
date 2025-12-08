@@ -5,6 +5,11 @@ import {
 import { profileService } from '../../services/profile-service';
 import { TheoryProfile } from '@cicada/shared-types';
 import { logger } from '../../utils/logger';
+import {
+  invokeAgentWithRetry,
+  processStreamWithErrorHandling,
+} from '../../utils/agent-invocation';
+import { AgentInvocationError } from '../../types/agentcore';
 
 const bedrockAgentClient = new BedrockAgentRuntimeClient({ 
   region: process.env.AWS_REGION || 'us-east-1' 
@@ -75,28 +80,41 @@ export async function invokeQueryAgentForEvidence(
       inputText += `\n\nEpisode Context: ${input.episodeContext.join(', ')}`;
     }
 
-    // Invoke Query Agent via BedrockAgentRuntime
-    const command = new InvokeAgentCommand({
-      agentId: queryAgentId,
-      agentAliasId: queryAgentAliasId,
-      sessionId: `theory-query-${sessionId}`, // Unique session for Query Agent invoked by Theory Agent
-      inputText,
-      enableTrace: false,
-    });
-
-    const response = await bedrockAgentClient.send(command);
-
-    // Collect the complete response from the stream
-    let completeResponse = '';
-    
-    if (response.completion) {
-      for await (const chunk of response.completion) {
-        if (chunk.chunk?.bytes) {
-          const text = new TextDecoder().decode(chunk.chunk.bytes);
-          completeResponse += text;
-        }
+    // Invoke Query Agent via BedrockAgentRuntime with retry logic
+    // Requirement 7.3: Implement retry logic with exponential backoff
+    const response = await invokeAgentWithRetry(
+      bedrockAgentClient,
+      {
+        agentId: queryAgentId,
+        agentAliasId: queryAgentAliasId,
+        sessionId: `theory-query-${sessionId}`, // Unique session for Query Agent invoked by Theory Agent
+        inputText,
+        enableTrace: false,
+      },
+      'Query',
+      {
+        maxRetries: 3,
+        retryDelay: 1000,
+        timeout: 45000,
       }
+    );
+
+    // Collect the complete response from the stream with error handling
+    // Requirement 7.3: Add error handling for streaming interruptions
+    if (!response.completion) {
+      throw new Error('No completion stream received from Query Agent');
     }
+
+    const completeResponse = await processStreamWithErrorHandling(
+      response.completion,
+      async () => {},
+      async (error: Error) => {
+        logger.error('Query Agent streaming error (from Theory Agent)', {
+          error: error.message,
+          sessionId,
+        });
+      }
+    );
 
     logger.info('Query Agent invocation completed from Theory Agent', {
       responseLength: completeResponse.length,
@@ -105,8 +123,27 @@ export async function invokeQueryAgentForEvidence(
 
     return completeResponse;
   } catch (error) {
-    logger.error('Error invoking Query Agent from Theory Agent', { error, input, sessionId });
-    throw new Error(`Failed to invoke Query Agent: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    // Requirement 7.3: Add comprehensive error logging
+    // Property 6: Error Recovery - graceful error handling
+    logger.error('Error invoking Query Agent from Theory Agent', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      errorType: error instanceof AgentInvocationError ? 'AgentInvocationError' : error?.constructor?.name,
+      retryable: error instanceof AgentInvocationError ? error.retryable : false,
+      input,
+      sessionId,
+    });
+
+    // Re-throw AgentInvocationError as-is, wrap other errors
+    if (error instanceof AgentInvocationError) {
+      throw error;
+    }
+
+    throw new AgentInvocationError(
+      `Failed to invoke Query Agent: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      'Query',
+      false,
+      error instanceof Error ? error : undefined
+    );
   }
 }
 

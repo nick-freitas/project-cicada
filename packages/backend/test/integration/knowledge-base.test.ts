@@ -5,10 +5,15 @@ import {
   groupResultsByEpisode,
   ScriptEmbedding,
 } from '../../src/services/knowledge-base-service';
+import {
+  BedrockAgentRuntimeClient,
+  InvokeAgentCommand,
+} from '@aws-sdk/client-bedrock-agent-runtime';
+import { getAgentConfig } from '../../src/utils/agentcore-client';
 
 describe('Knowledge Base Service Integration Tests', () => {
   // Skip AWS-dependent tests in CI/CD - these require AWS credentials and deployed infrastructure
-  const skipAWSTests = !process.env.AWS_REGION || process.env.CI === 'true';
+  const skipAWSTests = !process.env.AWS_REGION || process.env.CI === 'true' || process.env.SKIP_INTEGRATION_TESTS === 'true';
 
   describe('generateEmbedding', () => {
     it.skip('should generate embedding for text', async () => {
@@ -97,5 +102,92 @@ describe('Knowledge Base Service Integration Tests', () => {
       expect(grouped.get('onikakushi')?.length).toBe(2);
       expect(grouped.get('watanagashi')?.length).toBe(1);
     });
+  });
+
+  describe('Knowledge Base Integration with Query Agent', () => {
+    it.skip('should invoke Query Agent for semantic search', async () => {
+      if (skipAWSTests || !process.env.QUERY_AGENT_ID) {
+        console.log('Skipping - Query Agent not deployed');
+        return;
+      }
+
+      const agentRuntimeClient = new BedrockAgentRuntimeClient({
+        region: process.env.AWS_REGION || 'us-east-1',
+      });
+
+      const queryConfig = getAgentConfig('query');
+      const sessionId = `test-kb-session-${Date.now()}`;
+      const testQuery = 'What does Rena say about taking things home?';
+
+      const command = new InvokeAgentCommand({
+        agentId: queryConfig.agentId,
+        agentAliasId: queryConfig.agentAliasId,
+        sessionId,
+        inputText: testQuery,
+        enableTrace: false,
+      });
+
+      const response = await agentRuntimeClient.send(command);
+
+      expect(response).toBeDefined();
+      expect(response.completion).toBeDefined();
+
+      // Collect response
+      let fullResponse = '';
+      if (response.completion) {
+        for await (const chunk of response.completion) {
+          if (chunk.chunk?.bytes) {
+            const text = new TextDecoder().decode(chunk.chunk.bytes);
+            fullResponse += text;
+          }
+        }
+      }
+
+      // Query Agent should return citations from Knowledge Base
+      expect(fullResponse.length).toBeGreaterThan(0);
+    }, 90000);
+
+    it.skip('should respect episode boundaries in Knowledge Base queries', async () => {
+      if (skipAWSTests || !process.env.QUERY_AGENT_ID) {
+        console.log('Skipping - Query Agent not deployed');
+        return;
+      }
+
+      const agentRuntimeClient = new BedrockAgentRuntimeClient({
+        region: process.env.AWS_REGION || 'us-east-1',
+      });
+
+      const queryConfig = getAgentConfig('query');
+      const sessionId = `test-kb-session-${Date.now()}`;
+      
+      // Query with episode context should only return results from that episode
+      const testQuery = 'Tell me about the festival in Onikakushi';
+
+      const command = new InvokeAgentCommand({
+        agentId: queryConfig.agentId,
+        agentAliasId: queryConfig.agentAliasId,
+        sessionId,
+        inputText: testQuery,
+        enableTrace: true, // Enable trace to see Knowledge Base queries
+      });
+
+      const response = await agentRuntimeClient.send(command);
+
+      expect(response).toBeDefined();
+      expect(response.completion).toBeDefined();
+
+      let fullResponse = '';
+      if (response.completion) {
+        for await (const chunk of response.completion) {
+          if (chunk.chunk?.bytes) {
+            const text = new TextDecoder().decode(chunk.chunk.bytes);
+            fullResponse += text;
+          }
+        }
+      }
+
+      expect(fullResponse.length).toBeGreaterThan(0);
+      // Response should reference Onikakushi episode
+    }, 90000);
   });
 });

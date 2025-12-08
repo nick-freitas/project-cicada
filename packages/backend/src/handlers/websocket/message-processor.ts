@@ -9,6 +9,12 @@ import { RequestTrackingService } from '../../services/request-tracking-service'
 import { sendToConnection } from './handler';
 import { WebSocketResponse } from '@cicada/shared-types';
 import { logger } from '../../utils/logger';
+import {
+  invokeAgentWithRetry,
+  processStreamWithErrorHandling,
+  getUserFriendlyErrorMessage,
+} from '../../utils/agent-invocation';
+import { AgentInvocationError } from '../../types/agentcore';
 
 const dynamoClient = new DynamoDBClient({});
 const agentRuntimeClient = new BedrockAgentRuntimeClient({});
@@ -53,16 +59,9 @@ export const handler: SQSHandler = async (event: SQSEvent): Promise<void> => {
         );
       }
 
-      // Invoke Orchestrator Agent via AgentCore with streaming
+      // Invoke Orchestrator Agent via AgentCore with streaming and retry logic
       // Requirement 7.1: Use AgentCore's invocation API
-      const command = new InvokeAgentCommand({
-        agentId: ORCHESTRATOR_AGENT_ID,
-        agentAliasId: ORCHESTRATOR_AGENT_ALIAS_ID,
-        sessionId: sessionId,
-        inputText: userMessage,
-        enableTrace: false, // Disable trace for production to reduce costs
-      });
-
+      // Requirement 7.3: Implement retry logic with exponential backoff
       logger.info('Invoking Orchestrator Agent', {
         requestId,
         agentId: ORCHESTRATOR_AGENT_ID,
@@ -70,24 +69,33 @@ export const handler: SQSHandler = async (event: SQSEvent): Promise<void> => {
         sessionId,
       });
 
-      const response: InvokeAgentCommandOutput = await agentRuntimeClient.send(command);
+      const response: InvokeAgentCommandOutput = await invokeAgentWithRetry(
+        agentRuntimeClient,
+        {
+          agentId: ORCHESTRATOR_AGENT_ID,
+          agentAliasId: ORCHESTRATOR_AGENT_ALIAS_ID,
+          sessionId: sessionId,
+          inputText: userMessage,
+          enableTrace: false, // Disable trace for production to reduce costs
+        },
+        'Orchestrator',
+        {
+          maxRetries: 3,
+          retryDelay: 1000,
+          timeout: 60000,
+        }
+      );
 
-      // Process streaming response chunks
+      // Process streaming response chunks with error handling
       // Requirement 8.1: Use AgentCore's streaming capabilities
+      // Requirement 7.3: Add error handling for streaming interruptions
       if (!response.completion) {
         throw new Error('No completion stream received from agent');
       }
 
-      let fullResponse = '';
-      let chunkCount = 0;
-
-      for await (const event of response.completion) {
-        // Handle chunk events
-        if (event.chunk?.bytes) {
-          const chunkText = new TextDecoder().decode(event.chunk.bytes);
-          fullResponse += chunkText;
-          chunkCount++;
-
+      const fullResponse = await processStreamWithErrorHandling(
+        response.completion,
+        async (chunkText: string) => {
           // Store chunk for reconnection support
           await requestTrackingService.addResponseChunk(requestId, chunkText);
 
@@ -100,30 +108,24 @@ export const handler: SQSHandler = async (event: SQSEvent): Promise<void> => {
           };
 
           await sendToConnection(DOMAIN_NAME, STAGE, connectionId, chunkResponse);
-
-          logger.debug('Sent chunk to client', {
+        },
+        async (error: Error) => {
+          // Handle streaming errors
+          logger.error('Streaming error', {
             requestId,
-            chunkNumber: chunkCount,
-            chunkLength: chunkText.length,
+            error: error.message,
           });
-        }
 
-        // Handle trace events (if enabled)
-        if (event.trace) {
-          logger.debug('Agent trace', {
+          // Send error to client
+          const errorResponse: WebSocketResponse = {
             requestId,
-            trace: event.trace,
-          });
-        }
+            type: 'error',
+            error: getUserFriendlyErrorMessage(error, 'Orchestrator'),
+          };
 
-        // Handle return control events (for action groups)
-        if (event.returnControl) {
-          logger.debug('Agent return control', {
-            requestId,
-            invocationId: event.returnControl.invocationId,
-          });
+          await sendToConnection(DOMAIN_NAME, STAGE, connectionId, errorResponse);
         }
-      }
+      );
 
       // Send completion marker
       // Requirement 8.1: Send completion marker when stream completes
@@ -141,13 +143,18 @@ export const handler: SQSHandler = async (event: SQSEvent): Promise<void> => {
       logger.info('Message processing complete', {
         requestId,
         duration,
-        chunkCount,
         responseLength: fullResponse.length,
       });
     } catch (error) {
       const duration = Date.now() - startTime;
+      
+      // Requirement 7.3: Add comprehensive error logging
+      // Property 6: Error Recovery - provide meaningful error message without exposing internal details
       logger.error('Error processing message', {
         error: error instanceof Error ? error.message : 'Unknown error',
+        errorType: error instanceof AgentInvocationError ? 'AgentInvocationError' : error?.constructor?.name,
+        retryable: error instanceof AgentInvocationError ? error.retryable : false,
+        agentName: error instanceof AgentInvocationError ? error.agentName : undefined,
         stack: error instanceof Error ? error.stack : undefined,
         requestId,
         duration,
@@ -162,10 +169,15 @@ export const handler: SQSHandler = async (event: SQSEvent): Promise<void> => {
           );
 
           // Requirement 8.1: Send error marker when stream encounters error
+          // Property 6: Error Recovery - provide meaningful error message without exposing internal details
+          const userFriendlyMessage = error instanceof AgentInvocationError
+            ? getUserFriendlyErrorMessage(error.originalError || error, error.agentName)
+            : getUserFriendlyErrorMessage(error, 'System');
+
           const errorResponse: WebSocketResponse = {
             requestId,
             type: 'error',
-            error: 'An error occurred processing your request. Please try again.',
+            error: userFriendlyMessage,
           };
 
           await sendToConnection(DOMAIN_NAME, STAGE, connectionId, errorResponse);
