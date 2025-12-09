@@ -6,3 +6,6 @@ export * from './profile-service';
 export * from './memory-service';
 export * from './fragment-group-service';
 export * from './request-tracking-service';
+
+// AgentCore services
+export * from './agentcore';

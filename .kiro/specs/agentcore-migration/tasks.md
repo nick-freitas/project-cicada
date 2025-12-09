@@ -32,27 +32,27 @@ This plan migrates from Bedrock Agents (managed service) to AgentCore framework 
 
 ### Phase 1: Setup AgentCore Framework
 
-- [ ] 1. Install and configure AgentCore SDK
+- [x] 1. Install and configure AgentCore SDK
   - Install @aws/strands-sdk package in backend
   - Configure TypeScript types for AgentCore
   - Set up base agent classes and interfaces
   - _Requirements: 1.1, 1.2_
 
-- [ ] 2. Implement AgentCore Identity service
+- [x] 2. Implement AgentCore Identity service
   - Create IdentityService class for user authentication
   - Implement getUserIdentity() method
   - Implement validateIdentity() method
   - Add Cognito integration for user extraction
   - _Requirements: 9.1, 9.2_
 
-- [ ] 3. Implement AgentCore Policy service
+- [x] 3. Implement AgentCore Policy service
   - Create PolicyService class for access control
   - Implement getPolicy() method
   - Implement enforcePolicy() method with rate limiting
   - Add data isolation enforcement (strict mode)
   - _Requirements: 10.1, 10.2, 10.3, 10.4_
 
-- [ ] 4. Implement AgentCore Memory service
+- [-] 4. Implement AgentCore Memory service
   - Create MemoryService class for conversation history
   - Implement getSession() method
   - Implement addMessage() method
