@@ -4,6 +4,7 @@ import * as budgets from 'aws-cdk-lib/aws-budgets';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 import * as actions from 'aws-cdk-lib/aws-cloudwatch-actions';
+import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import { Construct } from 'constructs';
 import { DataStack } from './data-stack';
 import { APIStack } from './api-stack';
@@ -325,12 +326,14 @@ export class MonitoringStack extends cdk.Stack {
     // Create custom metrics namespace
     const namespace = 'CICADA/Agents';
 
-    // Define agent names for metrics
-    const agents = [
-      { name: 'Orchestrator', function: agentStack.orchestratorAgentToolsFunction },
-      { name: 'Query', function: agentStack.queryAgentToolsFunction },
-      { name: 'Theory', function: agentStack.theoryAgentToolsFunction },
-      { name: 'Profile', function: agentStack.profileAgentToolsFunction },
+    // TODO: Task 14 - Update agent monitoring for AgentCore Lambda functions
+    // Define agent names for metrics (currently empty until AgentCore functions are added)
+    const agents: Array<{ name: string; function?: lambdaNodejs.NodejsFunction }> = [
+      // { name: 'Gateway', function: agentStack.gatewayFunction },
+      // { name: 'Orchestrator', function: agentStack.orchestratorFunction },
+      // { name: 'Query', function: agentStack.queryFunction },
+      // { name: 'Theory', function: agentStack.theoryFunction },
+      // { name: 'Profile', function: agentStack.profileFunction },
     ];
 
     // Agent Invocation Count Widget
@@ -489,56 +492,61 @@ export class MonitoringStack extends cdk.Stack {
     );
 
     // Lambda Function Metrics for Agent Tools
-    const lambdaInvocations = agents.map(agent =>
-      agent.function.metricInvocations({
-        statistic: 'Sum',
-        period: cdk.Duration.minutes(5),
-        label: `${agent.name} Lambda Invocations`,
-      })
-    );
+    // Filter out agents without functions (during migration)
+    const agentsWithFunctions = agents.filter(agent => agent.function !== undefined);
+    
+    if (agentsWithFunctions.length > 0) {
+      const lambdaInvocations = agentsWithFunctions.map(agent =>
+        agent.function!.metricInvocations({
+          statistic: 'Sum',
+          period: cdk.Duration.minutes(5),
+          label: `${agent.name} Lambda Invocations`,
+        })
+      );
 
-    this.agentDashboard.addWidgets(
-      new cloudwatch.GraphWidget({
-        title: 'Agent Tools Lambda Invocations',
-        left: lambdaInvocations,
-        width: 12,
-        height: 6,
-      })
-    );
+      this.agentDashboard.addWidgets(
+        new cloudwatch.GraphWidget({
+          title: 'Agent Tools Lambda Invocations',
+          left: lambdaInvocations,
+          width: 12,
+          height: 6,
+        })
+      );
 
-    const lambdaErrors = agents.map(agent =>
-      agent.function.metricErrors({
-        statistic: 'Sum',
-        period: cdk.Duration.minutes(5),
-        label: `${agent.name} Lambda Errors`,
-      })
-    );
+      const lambdaErrors = agentsWithFunctions.map(agent =>
+        agent.function!.metricErrors({
+          statistic: 'Sum',
+          period: cdk.Duration.minutes(5),
+          label: `${agent.name} Lambda Errors`,
+        })
+      );
 
-    this.agentDashboard.addWidgets(
-      new cloudwatch.GraphWidget({
-        title: 'Agent Tools Lambda Errors',
-        left: lambdaErrors,
-        width: 12,
-        height: 6,
-      })
-    );
+      this.agentDashboard.addWidgets(
+        new cloudwatch.GraphWidget({
+          title: 'Agent Tools Lambda Errors',
+          left: lambdaErrors,
+          width: 12,
+          height: 6,
+        })
+      );
 
-    const lambdaDuration = agents.map(agent =>
-      agent.function.metricDuration({
-        statistic: 'Average',
-        period: cdk.Duration.minutes(5),
-        label: `${agent.name} Lambda Duration`,
-      })
-    );
+      const lambdaDuration = agentsWithFunctions.map(agent =>
+        agent.function!.metricDuration({
+          statistic: 'Average',
+          period: cdk.Duration.minutes(5),
+          label: `${agent.name} Lambda Duration`,
+        })
+      );
 
-    this.agentDashboard.addWidgets(
-      new cloudwatch.GraphWidget({
-        title: 'Agent Tools Lambda Duration (ms)',
-        left: lambdaDuration,
-        width: 12,
-        height: 6,
-      })
-    );
+      this.agentDashboard.addWidgets(
+        new cloudwatch.GraphWidget({
+          title: 'Agent Tools Lambda Duration (ms)',
+          left: lambdaDuration,
+          width: 12,
+          height: 6,
+        })
+      );
+    }
 
     // Single Value Widgets for Key Metrics
     this.agentDashboard.addWidgets(
@@ -600,7 +608,7 @@ export class MonitoringStack extends cdk.Stack {
     // Create alarms for agent errors
     // Requirement 13.5: Set up alarms for agent errors
     if (this.alarmTopic) {
-      agents.forEach(agent => {
+      agentsWithFunctions.forEach(agent => {
         // Alarm for high error rate
         const errorAlarm = new cloudwatch.Alarm(this, `${agent.name}AgentErrorAlarm`, {
           alarmName: `CICADA-${agent.name}-Agent-Errors`,
@@ -625,7 +633,7 @@ export class MonitoringStack extends cdk.Stack {
         }
 
         // Alarm for Lambda function errors
-        const lambdaErrorAlarm = agent.function.metricErrors({
+        const lambdaErrorAlarm = agent.function!.metricErrors({
           statistic: 'Sum',
           period: cdk.Duration.minutes(5),
         }).createAlarm(this, `${agent.name}LambdaErrorAlarm`, {

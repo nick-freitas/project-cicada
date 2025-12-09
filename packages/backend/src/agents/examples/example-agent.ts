@@ -57,9 +57,12 @@ Your responsibilities:
       }
 
       // Invoke the Strands Agent
-      const response = await this.invoke(prompt);
+      const agentResult = await this.invoke(prompt);
 
       const processingTime = Date.now() - startTime;
+
+      // Extract text content from agent result
+      const responseContent = agentResult.toString();
 
       // Log success
       this.logActivity('info', 'Example agent completed', {
@@ -68,7 +71,7 @@ Your responsibilities:
       });
 
       return {
-        content: response,
+        content: responseContent,
         metadata: {
           agentsInvoked: ['ExampleAgent'],
           toolsUsed: [],

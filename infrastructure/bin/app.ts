@@ -18,18 +18,19 @@ const env = {
 // Data layer - S3, DynamoDB, Knowledge Base
 const dataStack = new DataStack(app, 'ProjectCICADADataStack', { env });
 
-// Agent layer - AgentCore agents (Orchestrator, Query, Theory, Profile)
-const agentStack = new AgentStack(app, 'ProjectCICADAAgentStack', {
-  env,
-  dataStack,
-});
-
 // Auth layer - Cognito
 const authStack = new AuthStack(app, 'ProjectCICADAAuthStack', {
   env,
   adminEmail: process.env.ADMIN_EMAIL,
   nickEmail: process.env.NICK_EMAIL,
   naizakEmail: process.env.NAIZAK_EMAIL,
+});
+
+// Agent layer - AgentCore agents (Orchestrator, Query, Theory, Profile)
+const agentStack = new AgentStack(app, 'ProjectCICADAAgentStack', {
+  env,
+  dataStack,
+  authStack,
 });
 
 // API layer - API Gateway + Lambda functions

@@ -13,4 +13,7 @@ module.exports = {
   moduleNameMapper: {
     '^@cicada/shared-types$': '<rootDir>/../shared-types/src',
   },
+  transformIgnorePatterns: [
+    'node_modules/(?!(@strands-agents)/)',
+  ],
 };

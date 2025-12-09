@@ -144,15 +144,8 @@ export class APIStack extends cdk.Stack {
         KNOWLEDGE_BASE_BUCKET: props.dataStack.knowledgeBaseBucket.bucketName,
         WEBSOCKET_DOMAIN_NAME: `${this.webSocketApi.apiId}.execute-api.${this.region}.amazonaws.com`,
         WEBSOCKET_STAGE: this.webSocketStage.stageName,
-        // AgentCore agent IDs for invocation
-        ORCHESTRATOR_AGENT_ID: props.agentStack.orchestratorAgent.attrAgentId,
-        ORCHESTRATOR_AGENT_ALIAS_ID: props.agentStack.orchestratorAgentAlias.attrAgentAliasId,
-        QUERY_AGENT_ID: props.agentStack.queryAgent.attrAgentId,
-        QUERY_AGENT_ALIAS_ID: props.agentStack.queryAgentAlias.attrAgentAliasId,
-        THEORY_AGENT_ID: props.agentStack.theoryAgent.attrAgentId,
-        THEORY_AGENT_ALIAS_ID: props.agentStack.theoryAgentAlias.attrAgentAliasId,
-        PROFILE_AGENT_ID: props.agentStack.profileAgent.attrAgentId,
-        PROFILE_AGENT_ALIAS_ID: props.agentStack.profileAgentAlias.attrAgentAliasId,
+        // Task 16: Add Gateway Lambda function ARN for invocation
+        GATEWAY_FUNCTION_ARN: props.agentStack.gatewayFunction.functionArn,
       },
       bundling: {
         externalModules: ['@aws-sdk/*'],
@@ -169,26 +162,9 @@ export class APIStack extends cdk.Stack {
     props.dataStack.knowledgeBaseBucket.grantRead(messageProcessor);
     connectionsTable.grantReadWriteData(messageProcessor);
 
-    // Grant Bedrock permissions
-    messageProcessor.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'],
-        resources: ['*'],
-      })
-    );
-
-    // Grant permission to invoke AgentCore agents
-    messageProcessor.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: ['bedrock:InvokeAgent'],
-        resources: [
-          `arn:aws:bedrock:${this.region}:${this.account}:agent/*`,
-          `arn:aws:bedrock:${this.region}:${this.account}:agent-alias/*`,
-        ],
-      })
-    );
+    // Task 16: Grant permission to invoke Gateway Lambda
+    // Note: Bedrock permissions removed as Gateway handles all AI model invocations
+    props.agentStack.gatewayFunction.grantInvoke(messageProcessor);
 
     // Grant permission to post to WebSocket connections
     messageProcessor.addToRolePolicy(

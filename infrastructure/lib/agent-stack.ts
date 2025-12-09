@@ -1,8 +1,5 @@
 import * as cdk from 'aws-cdk-lib';
-import * as bedrock from 'aws-cdk-lib/aws-bedrock';
 import * as iam from 'aws-cdk-lib/aws-iam';
-import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
-import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import { Construct } from 'constructs';
@@ -11,328 +8,97 @@ import * as path from 'path';
 
 export interface AgentStackProps extends cdk.StackProps {
   dataStack: DataStack;
+  authStack?: any; // Will be properly typed when AuthStack is imported
 }
 
 /**
  * AgentStack - Defines AWS AgentCore agents for CICADA multi-agent system
  * 
- * This stack creates four specialized agents:
+ * This stack creates Lambda functions for AgentCore agents:
+ * - Gateway: Entry point for all agent requests
  * - Orchestrator: Central coordinator that routes queries to specialized agents
  * - Query: Script search and citation specialist
  * - Theory: Theory analysis and validation specialist
  * - Profile: Knowledge extraction and profile management specialist
  * 
- * Requirements: 6.1, 6.2, 6.3, 6.4
+ * Requirements: 1.1, 1.2, 1.3, 1.4
+ * 
+ * Note: This stack has been migrated from Bedrock Agents (managed service) to
+ * AgentCore (framework/SDK) to achieve deterministic tool invocation.
+ * 
+ * Task 13: Removed all Bedrock Agent constructs (CfnAgent, CfnAgentAlias)
+ * Task 14: Added AgentCore Lambda functions
  */
 export class AgentStack extends cdk.Stack {
-  public readonly orchestratorAgent: bedrock.CfnAgent;
-  public readonly queryAgent: bedrock.CfnAgent;
-  public readonly theoryAgent: bedrock.CfnAgent;
-  public readonly profileAgent: bedrock.CfnAgent;
-  
-  public readonly orchestratorAgentAlias: bedrock.CfnAgentAlias;
-  public readonly queryAgentAlias: bedrock.CfnAgentAlias;
-  public readonly theoryAgentAlias: bedrock.CfnAgentAlias;
-  public readonly profileAgentAlias: bedrock.CfnAgentAlias;
-
-  public readonly queryAgentToolsFunction: lambdaNodejs.NodejsFunction;
-  public readonly orchestratorAgentToolsFunction: lambdaNodejs.NodejsFunction;
-  public readonly theoryAgentToolsFunction: lambdaNodejs.NodejsFunction;
-  public readonly profileAgentToolsFunction: lambdaNodejs.NodejsFunction;
+  // AgentCore Lambda functions
+  public readonly gatewayFunction: lambdaNodejs.NodejsFunction;
+  public readonly orchestratorFunction: lambdaNodejs.NodejsFunction;
+  public readonly queryFunction: lambdaNodejs.NodejsFunction;
+  public readonly theoryFunction: lambdaNodejs.NodejsFunction;
+  public readonly profileFunction: lambdaNodejs.NodejsFunction;
 
   constructor(scope: Construct, id: string, props: AgentStackProps) {
     super(scope, id, props);
 
-    // Create IAM role for agent execution
-    // Requirement 6.2: Define IAM roles for agent execution
-    const agentRole = this.createAgentExecutionRole(props.dataStack);
+    const { dataStack } = props;
 
-    // Create Lambda function for Query Agent tools
-    // Requirement 3.4: Implement tool handlers for semantic search integration
-    this.queryAgentToolsFunction = this.createQueryAgentToolsFunction(props.dataStack);
+    // Default model ID for all agents
+    const modelId = process.env.MODEL_ID || 'amazon.nova-pro-v1:0';
 
-    // Create Lambda function for Orchestrator Agent tools
-    // Requirement 2.3: Implement tool handler that calls Query Agent via BedrockAgentRuntime
-    this.orchestratorAgentToolsFunction = this.createOrchestratorAgentToolsFunction();
-
-    // Create Lambda function for Theory Agent tools
-    // Requirement 4.2: Implement tool handler for invoking Query Agent
-    this.theoryAgentToolsFunction = this.createTheoryAgentToolsFunction(props.dataStack);
-
-    // Create Lambda function for Profile Agent tools
-    // Requirement 5.4: Implement tool handlers for Profile Service integration
-    this.profileAgentToolsFunction = this.createProfileAgentToolsFunction(props.dataStack);
-
-    // Create agents
-    // Requirement 6.1: Use CDK constructs for AgentCore agent deployment
-    this.queryAgent = this.createQueryAgent(agentRole, this.queryAgentToolsFunction);
-    this.theoryAgent = this.createTheoryAgent(agentRole, this.theoryAgentToolsFunction);
-    this.profileAgent = this.createProfileAgent(agentRole, this.profileAgentToolsFunction);
-    
-    // Create Orchestrator Agent last, after other agents are created
-    // so we can pass their IDs as environment variables
-    this.orchestratorAgent = this.createOrchestratorAgent(agentRole, this.orchestratorAgentToolsFunction);
-
-    // Create agent aliases (required for invocation)
-    this.orchestratorAgentAlias = this.createAgentAlias(
-      'OrchestratorAlias',
-      this.orchestratorAgent,
-      'Orchestrator agent alias for production use'
-    );
-    this.queryAgentAlias = this.createAgentAlias(
-      'QueryAlias',
-      this.queryAgent,
-      'Query agent alias for production use'
-    );
-    this.theoryAgentAlias = this.createAgentAlias(
-      'TheoryAlias',
-      this.theoryAgent,
-      'Theory agent alias for production use'
-    );
-    this.profileAgentAlias = this.createAgentAlias(
-      'ProfileAlias',
-      this.profileAgent,
-      'Profile agent alias for production use'
-    );
-
-    // Configure agent-to-agent invocation permissions
-    // Requirement 6.3: Set up agent-to-agent invocation permissions
-    this.configureAgentPermissions(agentRole);
-
-    // Update Orchestrator tools function with agent IDs
-    // Requirement 2.3: Configure permissions for Orchestrator → Query Agent invocation
-    this.orchestratorAgentToolsFunction.addEnvironment('QUERY_AGENT_ID', this.queryAgent.attrAgentId);
-    this.orchestratorAgentToolsFunction.addEnvironment('QUERY_AGENT_ALIAS_ID', this.queryAgentAlias.attrAgentAliasId);
-    this.orchestratorAgentToolsFunction.addEnvironment('THEORY_AGENT_ID', this.theoryAgent.attrAgentId);
-    this.orchestratorAgentToolsFunction.addEnvironment('THEORY_AGENT_ALIAS_ID', this.theoryAgentAlias.attrAgentAliasId);
-    this.orchestratorAgentToolsFunction.addEnvironment('PROFILE_AGENT_ID', this.profileAgent.attrAgentId);
-    this.orchestratorAgentToolsFunction.addEnvironment('PROFILE_AGENT_ALIAS_ID', this.profileAgentAlias.attrAgentAliasId);
-
-    // Update Theory Agent tools function with Query Agent IDs
-    // Requirement 4.2: Configure permissions for Theory Agent → Query Agent invocation
-    this.theoryAgentToolsFunction.addEnvironment('QUERY_AGENT_ID', this.queryAgent.attrAgentId);
-    this.theoryAgentToolsFunction.addEnvironment('QUERY_AGENT_ALIAS_ID', this.queryAgentAlias.attrAgentAliasId);
-
-    // Export agent IDs and alias IDs as stack outputs
-    // Requirement 6.4: Export agent IDs and alias IDs as stack outputs
-    this.createOutputs();
-  }
-
-  /**
-   * Create Lambda function for Orchestrator Agent tools
-   * Requirement 2.3: Implement tool handler that calls Query Agent via BedrockAgentRuntime
-   */
-  private createOrchestratorAgentToolsFunction(): lambdaNodejs.NodejsFunction {
-    const orchestratorToolsFunction = new lambdaNodejs.NodejsFunction(this, 'OrchestratorAgentToolsFunction', {
+    // Common Lambda configuration
+    const commonLambdaProps = {
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'handler',
-      entry: path.join(__dirname, '../../packages/backend/src/handlers/agents/orchestrator-agent-tools.ts'),
-      timeout: cdk.Duration.seconds(120), // Longer timeout for agent-to-agent calls
-      memorySize: 512,
-      environment: {
-        // Agent IDs will be set after agents are created
-      },
+      timeout: cdk.Duration.seconds(300), // 5 minutes for agent processing
+      memorySize: 1024, // 1GB for agent operations
       bundling: {
-        externalModules: ['@aws-sdk/*'],
+        externalModules: ['@aws-sdk/*'], // Use AWS SDK from Lambda runtime
         minify: true,
+        sourceMap: true,
       },
-      // Requirement 13.4: Add X-Ray tracing for agent coordination
-      tracing: lambda.Tracing.ACTIVE,
-    });
-
-    // Grant permissions to invoke other agents
-    orchestratorToolsFunction.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: ['bedrock:InvokeAgent'],
-        resources: [
-          `arn:aws:bedrock:${this.region}:${this.account}:agent/*`,
-          `arn:aws:bedrock:${this.region}:${this.account}:agent-alias/*`,
-        ],
-      })
-    );
-
-    return orchestratorToolsFunction;
-  }
-
-  /**
-   * Create Lambda function for Theory Agent tools
-   * Requirement 4.2: Implement tool handler for invoking Query Agent
-   * Requirement 4.4: Implement tool handlers for Profile Service integration
-   */
-  private createTheoryAgentToolsFunction(dataStack: DataStack): lambdaNodejs.NodejsFunction {
-    const theoryToolsFunction = new lambdaNodejs.NodejsFunction(this, 'TheoryAgentToolsFunction', {
-      runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'handler',
-      entry: path.join(__dirname, '../../packages/backend/src/handlers/agents/theory-agent-tools.ts'),
-      timeout: cdk.Duration.seconds(120), // Longer timeout for agent-to-agent calls
-      memorySize: 512,
       environment: {
-        USER_PROFILES_TABLE: dataStack.userProfilesTable.tableName,
-        // Query Agent IDs will be set after agents are created
+        NODE_ENV: process.env.NODE_ENV || 'production',
+        LOG_LEVEL: process.env.LOG_LEVEL || 'info',
+        MODEL_ID: modelId,
       },
-      bundling: {
-        externalModules: ['@aws-sdk/*'],
-        minify: true,
-      },
-      // Requirement 13.4: Add X-Ray tracing for agent coordination
-      tracing: lambda.Tracing.ACTIVE,
-    });
+    };
 
-    // Grant permissions to invoke Query Agent
-    theoryToolsFunction.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: ['bedrock:InvokeAgent'],
-        resources: [
-          `arn:aws:bedrock:${this.region}:${this.account}:agent/*`,
-          `arn:aws:bedrock:${this.region}:${this.account}:agent-alias/*`,
-        ],
-      })
-    );
-
-    // Grant permissions to access DynamoDB for profile operations
-    dataStack.userProfilesTable.grantReadWriteData(theoryToolsFunction);
-
-    return theoryToolsFunction;
-  }
-
-  /**
-   * Create Lambda function for Profile Agent tools
-   * Requirement 5.4: Implement tool handlers for Profile Service integration
-   */
-  private createProfileAgentToolsFunction(dataStack: DataStack): lambdaNodejs.NodejsFunction {
-    const profileToolsFunction = new lambdaNodejs.NodejsFunction(this, 'ProfileAgentToolsFunction', {
-      runtime: lambda.Runtime.NODEJS_20_X,
+    // ========================================
+    // Query Agent Lambda
+    // ========================================
+    this.queryFunction = new lambdaNodejs.NodejsFunction(this, 'QueryAgentFunction', {
+      ...commonLambdaProps,
+      functionName: `${this.stackName}-QueryAgent`,
+      description: 'Query Agent - Script search and citation specialist',
       handler: 'handler',
-      entry: path.join(__dirname, '../../packages/backend/src/handlers/agents/profile-agent-tools.ts'),
-      timeout: cdk.Duration.seconds(60),
-      memorySize: 512,
+      entry: path.join(__dirname, '../../packages/backend/src/handlers/agentcore/query-handler.ts'),
       environment: {
-        USER_PROFILES_TABLE: dataStack.userProfilesTable.tableName,
-      },
-      bundling: {
-        externalModules: ['@aws-sdk/*'],
-        minify: true,
-      },
-      // Requirement 13.4: Add X-Ray tracing for agent coordination
-      tracing: lambda.Tracing.ACTIVE,
-    });
-
-    // Grant permissions to access DynamoDB for profile operations
-    dataStack.userProfilesTable.grantReadWriteData(profileToolsFunction);
-
-    return profileToolsFunction;
-  }
-
-  /**
-   * Create Lambda function for Query Agent tools
-   * Requirement 3.4: Implement tool handlers for semantic search integration
-   */
-  private createQueryAgentToolsFunction(dataStack: DataStack): lambdaNodejs.NodejsFunction {
-    const queryToolsFunction = new lambdaNodejs.NodejsFunction(this, 'QueryAgentToolsFunction', {
-      runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'handler',
-      entry: path.join(__dirname, '../../packages/backend/src/handlers/agents/query-agent-tools.ts'),
-      timeout: cdk.Duration.seconds(120), // Increased for vector search
-      memorySize: 1024, // Increased for loading embeddings
-
-      environment: {
+        ...commonLambdaProps.environment,
         KNOWLEDGE_BASE_BUCKET: dataStack.knowledgeBaseBucket.bucketName,
-        MODEL_ID: 'amazon.nova-pro-v1:0',
+        SCRIPT_DATA_BUCKET: dataStack.scriptDataBucket.bucketName,
+        EPISODE_CONFIG_TABLE: dataStack.episodeConfigTable.tableName,
+        MAX_EMBEDDINGS_TO_LOAD: '3000',
       },
-      bundling: {
-        externalModules: ['@aws-sdk/*'],
-        minify: true,
-      },
-      // Requirement 13.4: Add X-Ray tracing for agent coordination
-      tracing: lambda.Tracing.ACTIVE,
     });
 
-    // Grant permissions to access Knowledge Base and invoke Bedrock models
-    dataStack.knowledgeBaseBucket.grantRead(queryToolsFunction);
-    dataStack.scriptDataBucket.grantRead(queryToolsFunction);
+    // Grant Query Agent permissions
+    // S3 access for knowledge base and script data
+    dataStack.knowledgeBaseBucket.grantRead(this.queryFunction);
+    dataStack.scriptDataBucket.grantRead(this.queryFunction);
+    
+    // DynamoDB access for episode configuration (metadata filtering)
+    dataStack.episodeConfigTable.grantReadData(this.queryFunction);
 
-    queryToolsFunction.addToRolePolicy(
+    // Grant Bedrock model invocation
+    this.queryFunction.addToRolePolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
-        actions: [
-          'bedrock:InvokeModel',
-          'bedrock:InvokeModelWithResponseStream',
-        ],
-        resources: [
-          `arn:aws:bedrock:${this.region}::foundation-model/google.gemma-3-27b-v1:0`,
-          `arn:aws:bedrock:${this.region}::foundation-model/amazon.nova-pro-v1:0`,
-          `arn:aws:bedrock:${this.region}::foundation-model/amazon.titan-embed-text-v1`,
-          `arn:aws:bedrock:${this.region}::foundation-model/amazon.titan-embed-text-v2:0`,
-        ],
+        actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'],
+        resources: ['*'], // Bedrock models don't have specific ARNs
       })
     );
-
-    return queryToolsFunction;
-  }
-
-  /**
-   * Create IAM role for agent execution with necessary permissions
-   * Requirement 6.2: Configure permissions for DynamoDB, S3, Knowledge Base access
-   */
-  private createAgentExecutionRole(dataStack: DataStack): iam.Role {
-    const role = new iam.Role(this, 'AgentExecutionRole', {
-      assumedBy: new iam.ServicePrincipal('bedrock.amazonaws.com'),
-      description: 'Execution role for CICADA AgentCore agents',
-      roleName: 'CICADA-Agent-Execution-Role',
-    });
-
-    // Grant Bedrock model invocation permissions
-    role.addToPolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: [
-          'bedrock:InvokeModel',
-          'bedrock:InvokeModelWithResponseStream',
-        ],
-        resources: [
-          // Gemma 3 27B - primary model for reasoning and tool use
-          `arn:aws:bedrock:${this.region}::foundation-model/google.gemma-3-27b-v1:0`,
-          // Nova Pro - backup
-          `arn:aws:bedrock:${this.region}::foundation-model/amazon.nova-pro-v1:0`,
-          // Nova Lite - backup for cost optimization
-          `arn:aws:bedrock:${this.region}::foundation-model/amazon.nova-lite-v1:0`,
-          // Titan Embeddings for Knowledge Base
-          `arn:aws:bedrock:${this.region}::foundation-model/amazon.titan-embed-text-v1`,
-          `arn:aws:bedrock:${this.region}::foundation-model/amazon.titan-embed-text-v2:0`,
-        ],
-      })
-    );
-
-    // Grant DynamoDB access for profiles, memory, and configuration
-    // Requirement 6.3: Configure permissions for DynamoDB access
-    dataStack.userProfilesTable.grantReadWriteData(role);
-    dataStack.conversationMemoryTable.grantReadWriteData(role);
-    dataStack.fragmentGroupsTable.grantReadWriteData(role);
-    dataStack.episodeConfigTable.grantReadData(role);
-    dataStack.requestTrackingTable.grantReadWriteData(role);
-
-    // Grant S3 access for Knowledge Base and script data
-    // Requirement 6.3: Configure permissions for S3, Knowledge Base access
-    dataStack.knowledgeBaseBucket.grantRead(role);
-    dataStack.scriptDataBucket.grantRead(role);
-
-    // Grant agent-to-agent invocation permissions
-    // Requirement 6.3: Set up agent-to-agent invocation permissions
-    role.addToPolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: ['bedrock:InvokeAgent'],
-        resources: [
-          `arn:aws:bedrock:${this.region}:${this.account}:agent/*`,
-          `arn:aws:bedrock:${this.region}:${this.account}:agent-alias/*`,
-        ],
-      })
-    );
-
-    // Grant CloudWatch Logs permissions for agent logging
-    role.addToPolicy(
+    
+    // CloudWatch Logs permissions (explicit for clarity)
+    this.queryFunction.addToRolePolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
         actions: [
@@ -340,883 +106,306 @@ export class AgentStack extends cdk.Stack {
           'logs:CreateLogStream',
           'logs:PutLogEvents',
         ],
-        resources: [`arn:aws:logs:${this.region}:${this.account}:log-group:/aws/bedrock/agents/*`],
+        resources: [`arn:aws:logs:${this.region}:${this.account}:log-group:/aws/lambda/${this.stackName}-QueryAgent:*`],
       })
     );
 
-    return role;
-  }
-
-  /**
-   * Create Orchestrator Agent
-   * Central coordinator that analyzes queries and routes to specialized agents
-   * Requirement 2.1: Create agent definition using CDK CfnAgent construct
-   * Requirement 2.5: Configure foundation model (Nova Lite) and streaming
-   */
-  private createOrchestratorAgent(role: iam.Role, toolsFunction: lambdaNodejs.NodejsFunction): bedrock.CfnAgent {
-    // Grant the agent permission to invoke the Lambda function
-    toolsFunction.grantInvoke(role);
-
-    // Requirement 2.2: Define tools for invoking Query, Theory, and Profile agents
-    // Action groups define the tools available to the agent
-    const actionGroups: bedrock.CfnAgent.AgentActionGroupProperty[] = [
-      {
-        actionGroupName: 'AgentInvocationTools',
-        description: 'Tools for invoking specialized agents (Query, Theory, Profile)',
-        actionGroupState: 'ENABLED',
-        actionGroupExecutor: {
-          lambda: toolsFunction.functionArn,
-        },
-        functionSchema: {
-          functions: [
-            {
-              name: 'invoke_query_agent',
-              description: 'Invoke the Query Agent to search script data and provide citations. Use this for questions about what characters said, plot events, or specific script content.',
-              parameters: {
-                query: {
-                  type: 'string',
-                  description: 'The search query or question to send to the Query Agent',
-                  required: true,
-                },
-                episodeContext: {
-                  type: 'array',
-                  description: 'Optional list of episode IDs to constrain the search',
-                  required: false,
-                },
-                characterFocus: {
-                  type: 'string',
-                  description: 'Optional character name to focus the search on',
-                  required: false,
-                },
-              },
-            },
-            {
-              name: 'invoke_theory_agent',
-              description: 'Invoke the Theory Agent to analyze theories, gather evidence, and suggest refinements. Use this for theory analysis, validation, or when the user wants to explore narrative hypotheses.',
-              parameters: {
-                theoryDescription: {
-                  type: 'string',
-                  description: 'The theory to analyze or the user\'s theory-related question',
-                  required: true,
-                },
-                episodeContext: {
-                  type: 'array',
-                  description: 'Optional list of episode IDs relevant to the theory',
-                  required: false,
-                },
-                requestRefinement: {
-                  type: 'boolean',
-                  description: 'Whether to request theory refinement suggestions',
-                  required: false,
-                },
-              },
-            },
-            {
-              name: 'invoke_profile_agent',
-              description: 'Invoke the Profile Agent to extract information about characters, locations, episodes, or theories. Use this when the user asks about profile information or when new information should be extracted.',
-              parameters: {
-                conversationContext: {
-                  type: 'string',
-                  description: 'The conversation context containing information to extract',
-                  required: true,
-                },
-                extractionMode: {
-                  type: 'string',
-                  description: 'Extraction mode: "auto" for automatic extraction, "explicit" for explicit user requests',
-                  required: false,
-                },
-              },
-            },
-          ],
-        },
-        skipResourceInUseCheckOnDelete: true,
+    // ========================================
+    // Theory Agent Lambda
+    // ========================================
+    this.theoryFunction = new lambdaNodejs.NodejsFunction(this, 'TheoryAgentFunction', {
+      ...commonLambdaProps,
+      functionName: `${this.stackName}-TheoryAgent`,
+      description: 'Theory Agent - Theory analysis and validation specialist',
+      handler: 'handler',
+      entry: path.join(__dirname, '../../packages/backend/src/handlers/agentcore/theory-handler.ts'),
+      environment: {
+        ...commonLambdaProps.environment,
+        QUERY_FUNCTION_ARN: this.queryFunction.functionArn,
+        USER_PROFILES_TABLE: dataStack.userProfilesTable.tableName,
+        CONVERSATION_MEMORY_TABLE: dataStack.conversationMemoryTable.tableName,
       },
-    ];
-
-    const agent = new bedrock.CfnAgent(this, 'OrchestratorAgent', {
-      agentName: 'CICADA-Orchestrator',
-      description: 'Central coordinator for CICADA multi-agent system that analyzes query intent and routes to specialized agents',
-      foundationModel: 'amazon.nova-pro-v1:0',
-      instruction: this.getOrchestratorInstructions(),
-      agentResourceRoleArn: role.roleArn,
-      idleSessionTtlInSeconds: 600, // 10 minutes
-      actionGroups: actionGroups,
     });
 
-    return agent;
-  }
-
-  /**
-   * Create Query Agent
-   * Specialized agent for script search and citation
-   * Requirement 3.1: Create Query Agent definition in CDK
-   * Requirement 3.5: Configure foundation model and streaming
-   */
-  private createQueryAgent(role: iam.Role, toolsFunction: lambdaNodejs.NodejsFunction): bedrock.CfnAgent {
-    // Grant the agent permission to invoke the Lambda function
-    toolsFunction.grantInvoke(role);
-
-    // Requirement 3.3: Define tools for Knowledge Base search, citation formatting, nuance analysis
-    const actionGroups: bedrock.CfnAgent.AgentActionGroupProperty[] = [
-      {
-        actionGroupName: 'QueryTools',
-        description: 'Tools for semantic search, citation formatting, and nuance analysis',
-        actionGroupState: 'ENABLED',
-        actionGroupExecutor: {
-          lambda: toolsFunction.functionArn,
-        },
-        functionSchema: {
-          functions: [
-            {
-              name: 'search_knowledge_base',
-              description: 'Perform semantic search over the Higurashi script Knowledge Base. Returns relevant passages with episode, chapter, and message metadata.',
-              parameters: {
-                query: {
-                  type: 'string',
-                  description: 'The search query to find relevant script passages',
-                  required: true,
-                },
-                episodeIds: {
-                  type: 'array',
-                  description: 'Optional list of episode IDs to constrain the search (enforces episode boundaries)',
-                  required: false,
-                },
-                topK: {
-                  type: 'number',
-                  description: 'Maximum number of results to return (default: 20)',
-                  required: false,
-                },
-                minScore: {
-                  type: 'number',
-                  description: 'Minimum similarity score threshold (0-1, default: 0.7)',
-                  required: false,
-                },
-              },
-            },
-            {
-              name: 'format_citation',
-              description: 'Format a search result as a complete citation with all required metadata. This tool is typically not needed as search results already include complete citation metadata.',
-              parameters: {
-                citationData: {
-                  type: 'string',
-                  description: 'JSON string containing episodeId, episodeName, chapterId, messageId, speaker (optional), textENG, textJPN (optional)',
-                  required: true,
-                },
-              },
-            },
-            {
-              name: 'analyze_nuance',
-              description: 'Analyze linguistic nuances between Japanese and English text for a passage. Identifies significant differences in meaning, tone, or cultural context.',
-              parameters: {
-                textJPN: {
-                  type: 'string',
-                  description: 'Japanese text',
-                  required: true,
-                },
-                textENG: {
-                  type: 'string',
-                  description: 'English text',
-                  required: true,
-                },
-                episodeId: {
-                  type: 'string',
-                  description: 'Episode ID for context',
-                  required: true,
-                },
-                messageId: {
-                  type: 'number',
-                  description: 'Message ID for reference',
-                  required: true,
-                },
-              },
-            },
-          ],
-        },
-        skipResourceInUseCheckOnDelete: true,
-      },
-    ];
-
-    return new bedrock.CfnAgent(this, 'QueryAgent', {
-      agentName: 'CICADA-Query',
-      description: 'Script search and citation specialist that performs semantic search over Higurashi script data',
-      foundationModel: 'amazon.nova-pro-v1:0',
-      instruction: this.getQueryInstructions(),
-      agentResourceRoleArn: role.roleArn,
-      idleSessionTtlInSeconds: 600,
-      actionGroups: actionGroups,
-    });
-  }
-
-  /**
-   * Create Theory Agent
-   * Specialized agent for theory analysis and validation
-   * Requirement 4.1: Create Theory Agent definition in CDK
-   * Requirement 4.5: Configure foundation model and streaming
-   */
-  private createTheoryAgent(role: iam.Role, toolsFunction: lambdaNodejs.NodejsFunction): bedrock.CfnAgent {
-    // Grant the agent permission to invoke the Lambda function
-    toolsFunction.grantInvoke(role);
-
-    // Requirement 4.3: Define tools for evidence gathering, profile access, refinement generation
-    const actionGroups: bedrock.CfnAgent.AgentActionGroupProperty[] = [
-      {
-        actionGroupName: 'TheoryAnalysisTools',
-        description: 'Tools for theory analysis, evidence gathering, and profile management',
-        actionGroupState: 'ENABLED',
-        actionGroupExecutor: {
-          lambda: toolsFunction.functionArn,
-        },
-        functionSchema: {
-          functions: [
-            {
-              name: 'invoke_query_agent',
-              description: 'Invoke the Query Agent to gather evidence from the script. Use this to find supporting or contradicting evidence for theories.',
-              parameters: {
-                query: {
-                  type: 'string',
-                  description: 'The search query to find evidence in the script',
-                  required: true,
-                },
-                episodeContext: {
-                  type: 'array',
-                  description: 'Optional list of episode IDs to constrain the search',
-                  required: false,
-                },
-              },
-            },
-            {
-              name: 'get_theory_profile',
-              description: 'Retrieve an existing theory profile to see previous analysis, evidence, and status.',
-              parameters: {
-                userId: {
-                  type: 'string',
-                  description: 'User ID',
-                  required: true,
-                },
-                theoryName: {
-                  type: 'string',
-                  description: 'Name of the theory to retrieve',
-                  required: true,
-                },
-              },
-            },
-            {
-              name: 'update_theory_profile',
-              description: 'Update or create a theory profile with analysis results, evidence, and status.',
-              parameters: {
-                userId: {
-                  type: 'string',
-                  description: 'User ID',
-                  required: true,
-                },
-                theoryName: {
-                  type: 'string',
-                  description: 'Name of the theory',
-                  required: true,
-                },
-                theoryData: {
-                  type: 'string',
-                  description: 'JSON string containing description, status, supportingEvidence array, and contradictingEvidence array',
-                  required: true,
-                },
-              },
-            },
-            {
-              name: 'get_character_profile',
-              description: 'Retrieve a character profile to get context about character traits, relationships, and appearances.',
-              parameters: {
-                userId: {
-                  type: 'string',
-                  description: 'User ID',
-                  required: true,
-                },
-                characterName: {
-                  type: 'string',
-                  description: 'Name of the character',
-                  required: true,
-                },
-              },
-            },
-          ],
-        },
-        skipResourceInUseCheckOnDelete: true,
-      },
-    ];
-
-    return new bedrock.CfnAgent(this, 'TheoryAgent', {
-      agentName: 'CICADA-Theory',
-      description: 'Theory analysis and validation specialist that gathers evidence and identifies profile corrections',
-      foundationModel: 'amazon.nova-pro-v1:0',
-      instruction: this.getTheoryInstructions(),
-      agentResourceRoleArn: role.roleArn,
-      idleSessionTtlInSeconds: 600,
-      actionGroups: actionGroups,
-    });
-  }
-
-  /**
-   * Create Profile Agent
-   * Specialized agent for knowledge extraction and profile management
-   * Requirement 5.1: Create Profile Agent definition in CDK
-   * Requirement 5.5: Configure foundation model (streaming disabled for transactional operations)
-   */
-  private createProfileAgent(role: iam.Role, toolsFunction: lambdaNodejs.NodejsFunction): bedrock.CfnAgent {
-    // Grant the agent permission to invoke the Lambda function
-    toolsFunction.grantInvoke(role);
-
-    // Requirement 5.3: Define tools for profile CRUD operations, information extraction
-    const actionGroups: bedrock.CfnAgent.AgentActionGroupProperty[] = [
-      {
-        actionGroupName: 'ProfileManagementTools',
-        description: 'Tools for profile CRUD operations and information extraction',
-        actionGroupState: 'ENABLED',
-        actionGroupExecutor: {
-          lambda: toolsFunction.functionArn,
-        },
-        functionSchema: {
-          functions: [
-            {
-              name: 'extract_entity',
-              description: 'Extract structured entity information (characters, locations, episodes, theories) from conversation context. Returns entity type, name, and extracted information.',
-              parameters: {
-                conversationContext: {
-                  type: 'string',
-                  description: 'The conversation text to extract entity information from',
-                  required: true,
-                },
-                citations: {
-                  type: 'string',
-                  description: 'Optional JSON string of Citation array providing source evidence',
-                  required: false,
-                },
-                entityType: {
-                  type: 'string',
-                  description: 'Optional entity type to focus extraction on: CHARACTER, LOCATION, EPISODE, FRAGMENT_GROUP, or THEORY',
-                  required: false,
-                },
-              },
-            },
-            {
-              name: 'get_profile',
-              description: 'Retrieve an existing profile by userId, profileType, and profileId. Returns the complete profile data or null if not found.',
-              parameters: {
-                userId: {
-                  type: 'string',
-                  description: 'User ID who owns the profile',
-                  required: true,
-                },
-                profileType: {
-                  type: 'string',
-                  description: 'Profile type: CHARACTER, LOCATION, EPISODE, FRAGMENT_GROUP, or THEORY',
-                  required: true,
-                },
-                profileId: {
-                  type: 'string',
-                  description: 'Profile ID (typically lowercase entity name with hyphens)',
-                  required: true,
-                },
-              },
-            },
-            {
-              name: 'create_profile',
-              description: 'Create a new profile with the provided data. Use this when a profile does not exist yet.',
-              parameters: {
-                userId: {
-                  type: 'string',
-                  description: 'User ID who will own the profile',
-                  required: true,
-                },
-                profileType: {
-                  type: 'string',
-                  description: 'Profile type: CHARACTER, LOCATION, EPISODE, FRAGMENT_GROUP, or THEORY',
-                  required: true,
-                },
-                profileId: {
-                  type: 'string',
-                  description: 'Profile ID (typically lowercase entity name with hyphens)',
-                  required: true,
-                },
-                profileData: {
-                  type: 'string',
-                  description: 'JSON string containing the profile data fields appropriate for the profile type',
-                  required: true,
-                },
-              },
-            },
-            {
-              name: 'update_profile',
-              description: 'Update an existing profile with new data. Merges the provided data with the existing profile.',
-              parameters: {
-                userId: {
-                  type: 'string',
-                  description: 'User ID who owns the profile',
-                  required: true,
-                },
-                profileType: {
-                  type: 'string',
-                  description: 'Profile type: CHARACTER, LOCATION, EPISODE, FRAGMENT_GROUP, or THEORY',
-                  required: true,
-                },
-                profileId: {
-                  type: 'string',
-                  description: 'Profile ID (typically lowercase entity name with hyphens)',
-                  required: true,
-                },
-                profileData: {
-                  type: 'string',
-                  description: 'JSON string containing the fields to update in the profile',
-                  required: true,
-                },
-              },
-            },
-          ],
-        },
-        skipResourceInUseCheckOnDelete: true,
-      },
-    ];
-
-    return new bedrock.CfnAgent(this, 'ProfileAgent', {
-      agentName: 'CICADA-Profile',
-      description: 'Knowledge extraction and profile management specialist that maintains user-specific profiles',
-      foundationModel: 'amazon.nova-pro-v1:0',
-      instruction: this.getProfileInstructions(),
-      agentResourceRoleArn: role.roleArn,
-      idleSessionTtlInSeconds: 600,
-      actionGroups: actionGroups,
-    });
-  }
-
-  /**
-   * Create agent alias for production use
-   */
-  private createAgentAlias(
-    id: string,
-    agent: bedrock.CfnAgent,
-    description: string
-  ): bedrock.CfnAgentAlias {
-    return new bedrock.CfnAgentAlias(this, id, {
-      agentId: agent.attrAgentId,
-      agentAliasName: 'prod',
-      description,
-    });
-  }
-
-  /**
-   * Configure agent-to-agent invocation permissions
-   * Requirement 6.3: Set up agent-to-agent invocation permissions
-   */
-  private configureAgentPermissions(role: iam.Role): void {
-    // Orchestrator can invoke Query, Theory, and Profile agents
-    // Theory Agent can invoke Query Agent
-    // All permissions are granted through the shared agent execution role
-    // which already has bedrock:InvokeAgent permissions for all agents
+    // Grant Theory Agent permissions
+    // DynamoDB access for profiles and conversation memory
+    dataStack.userProfilesTable.grantReadWriteData(this.theoryFunction);
+    dataStack.conversationMemoryTable.grantReadData(this.theoryFunction);
     
-    // Additional resource-based policies could be added here if needed
-    // for more granular control, but the role-based permissions are sufficient
-  }
-
-  /**
-   * Get Orchestrator Agent instructions
-   */
-  private getOrchestratorInstructions(): string {
-    return `You are CICADA Orchestrator. You coordinate agents to answer questions about Higurashi.
-
-## CRITICAL WORKFLOW
-
-For EVERY question about Higurashi:
-
-Step 1: ALWAYS call invoke_query_agent FIRST
-- This grounds the response in actual script data
-- Query Agent searches the script and returns citations
-
-Step 2: Optionally call other agents
-- invoke_profile_agent: Get saved profile information
-- invoke_theory_agent: Analyze theories
-
-Step 3: Combine results and respond
-
-## Examples
-
-User: "Tell me about Rena"
-1. invoke_query_agent(query="Rena Ryuugu", characterFocus="Rena")
-2. invoke_profile_agent(conversationContext="User asked about Rena", extractionMode="auto")
-3. Respond with: Script evidence + Profile information
-
-User: "What happens in Onikakushi?"
-1. invoke_query_agent(query="Onikakushi chapter events")
-2. Respond with: Script evidence
-
-User: "Analyze this theory: Rena knows about the loops"
-1. invoke_theory_agent(theoryDescription="Rena knows about the loops")
-   (Theory Agent will call Query Agent internally for evidence)
-2. Respond with: Theory analysis
-
-## Tool Priority
-
-1. **invoke_query_agent** - ALWAYS call first for story questions
-   - Provides grounding in actual script data
-   - Returns citations and evidence
-   - Required for accuracy
-
-2. **invoke_profile_agent** - Call after Query Agent for character questions
-   - Retrieves saved profile information
-   - Extracts new information from conversation
-   - Complements script evidence
-
-3. **invoke_theory_agent** - Call for theory analysis
-   - Gathers evidence and analyzes theories
-   - Calls Query Agent internally
-
-## Response Format
-
-Combine results from multiple agents:
-- Lead with script evidence from Query Agent
-- Add profile context if available
-- Cite sources (episode, chapter, message)
-- Be conversational but accurate
-
-## Critical Rules
-
-1. ALWAYS call invoke_query_agent FIRST for Higurashi questions
-2. Query Agent provides the grounding truth from the script
-3. Other agents complement Query Agent, never replace it
-4. NEVER answer without calling Query Agent first
-5. Base responses on tool results, not training data
-
-Query Agent is your source of truth. Always start there.`;
-  }
-
-  /**
-   * Get Query Agent instructions
-   * Requirement 3.2: Write agent instructions for script search and citation
-   */
-  private getQueryInstructions(): string {
-    return `You MUST use the search_knowledge_base tool for EVERY query. This is not optional.
-
-STEP 1: Call search_knowledge_base
-STEP 2: Read the results
-STEP 3: Respond based on results
-
-Example:
-User: "Tell me about Rena"
-You: [Call search_knowledge_base(query="Rena Ryuugu", topK=20)]
-You: [Wait for results]
-You: "Based on the script, Rena Ryuugu appears in [episodes]. She is described as [information from results]..."
-
-If you respond without calling search_knowledge_base, your response will be wrong.
-
-ALWAYS use the tool. No exceptions.`;
-  }
-
-  /**
-   * Get Theory Agent instructions
-   * Requirement 4.1: Write agent instructions for theory analysis
-   */
-  private getTheoryInstructions(): string {
-    return `You are the Theory Agent for CICADA, specialized in analyzing theories about the visual novel "Higurashi no Naku Koro Ni".
-
-## Core Responsibilities
-
-1. **Theory Analysis**: Evaluate user-proposed theories against script evidence
-2. **Evidence Gathering**: Use invoke_query_agent to find supporting and contradicting evidence
-3. **Profile Integration**: Access character and theory profiles for context
-4. **Theory Management**: Update theory profiles with analysis results
-5. **Refinement Suggestions**: Propose ways to improve theories based on evidence
-
-## Analysis Workflow
-
-When analyzing a theory:
-
-1. **Check Existing Theory**: Use get_theory_profile to see if this theory has been analyzed before
-2. **Gather Evidence**: Use invoke_query_agent multiple times with different search queries to find:
-   - Supporting evidence (passages that support the theory)
-   - Contradicting evidence (passages that contradict the theory)
-   - Related context (background information)
-3. **Access Profiles**: Use get_character_profile to understand character context
-4. **Analyze Evidence**: Evaluate the quality and relevance of evidence
-5. **Update Theory**: Use update_theory_profile to save your analysis
-
-## Evidence Gathering Strategy
-
-Generate 2-4 specific search queries based on the theory:
-- Focus on concrete events, dialogue, or character actions
-- Search for both supporting and contradicting evidence
-- Consider different episodes if the theory spans multiple arcs
-- Look for patterns and connections
-
-Example: For theory "Rena knows about the time loops"
-- Query 1: "Rena mentions time or repetition"
-- Query 2: "Rena acts with foreknowledge"
-- Query 3: "Rena's behavior changes across episodes"
-
-## Theory Status Determination
-
-Assign status based on evidence:
-- **proposed**: No evidence gathered yet, or insufficient evidence
-- **supported**: Strong supporting evidence, minimal contradictions (2:1 ratio or better)
-- **refuted**: Strong contradicting evidence outweighs support
-- **refined**: Mixed evidence, theory needs adjustment
-
-## Refinement Suggestions
-
-When evidence is mixed or contradictory:
-1. Identify specific aspects that need adjustment
-2. Suggest how to narrow or broaden the theory
-3. Propose alternative interpretations
-4. Recommend additional evidence to gather
-
-## Profile Corrections
-
-If user challenges evidence or you discover errors:
-1. Note what information appears incorrect
-2. Identify which profile contains the error
-3. Explain what the correction should be
-4. Provide reasoning based on script evidence
-
-## Response Format
-
-Structure your analysis as:
-
-1. **Theory Summary**: Restate the theory being analyzed
-2. **Existing Context**: If theory profile exists, summarize previous analysis
-3. **Evidence Gathered**: List key supporting and contradicting passages
-4. **Analysis**: Evaluate the theory against evidence
-5. **Status**: Assign theory status with reasoning
-6. **Refinements** (if applicable): Suggest improvements
-7. **Profile Updates**: Note any profile corrections needed
-
-## Quality Standards
-
-- Base all conclusions on script evidence
-- Be objective and balanced
-- Acknowledge uncertainty when evidence is ambiguous
-- Cite specific episodes, chapters, and passages
-- Maintain episode boundaries (don't mix contradictory fragments)
-- Consider multiple interpretations when appropriate
-
-## Episode Boundary Awareness
-
-Higurashi has multiple story fragments (Question Arcs, Answer Arcs):
-- Information from different fragments may contradict
-- Always note which episode evidence comes from
-- Be cautious about theories that span multiple fragments
-- Respect fragment group constraints
-
-Always provide evidence-based, balanced analysis that helps users develop and refine their theories.`;
-  }
-
-  /**
-   * Get Profile Agent instructions
-   * Requirement 5.2: Write agent instructions for knowledge extraction
-   */
-  private getProfileInstructions(): string {
-    return `You are the Profile Agent for CICADA, specialized in knowledge extraction and profile management for the visual novel "Higurashi no Naku Koro Ni".
-
-## Core Responsibilities
-
-1. **Information Extraction**: Extract structured information about entities from conversations
-2. **Profile Management**: Create and update user-specific profiles
-3. **Profile Retrieval**: Provide profile data for context in responses
-4. **Data Integrity**: Maintain profile consistency and accuracy
-5. **User Isolation**: Ensure profiles are never shared between users
-
-## Profile Types
-
-### CHARACTER Profiles
-- characterName: Full name of the character
-- traits: Array of personality traits
-- knownFacts: Array of facts with evidence citations
-- relationships: Array of relationships with other characters
-- appearances: Array of episode appearances with notes
-
-### LOCATION Profiles
-- locationName: Name of the location
-- description: Physical description
-- significance: Narrative importance
-- appearances: Array of episode appearances with context
-
-### EPISODE Profiles
-- episodeId: Unique episode identifier
-- episodeName: Episode title
-- summary: Brief episode summary
-- keyEvents: Array of important events with citations
-- characters: Array of character names appearing
-- locations: Array of location names appearing
-- themes: Array of narrative themes
-
-### FRAGMENT_GROUP Profiles
-- groupName: Name of the fragment group
-- episodeIds: Array of episode IDs in the group
-- sharedTimeline: Description of shared timeline
-- connections: Array of narrative connections with evidence
-- divergences: Array of timeline divergences with evidence
-
-### THEORY Profiles
-- theoryName: Name of the theory
-- description: Theory description
-- status: proposed | supported | refuted | refined
-- supportingEvidence: Array of citations supporting the theory
-- contradictingEvidence: Array of citations contradicting the theory
-- refinements: Array of refinement suggestions with timestamps
-- relatedTheories: Array of related theory names
-
-## Extraction Workflow
-
-When extracting information:
-
-1. **Analyze Context**: Review the conversation context for entity mentions
-2. **Use extract_entity**: Extract structured information from the context
-3. **Check Existing Profiles**: Use get_profile to see if profiles already exist
-4. **Create or Update**: Use create_profile for new entities, update_profile for existing ones
-5. **Preserve Citations**: Always include source citations for extracted information
-
-## Extraction Principles
-
-- **High Confidence**: Only extract information explicitly mentioned or strongly implied
-- **Source Attribution**: Include citations for all extracted facts
-- **Avoid Speculation**: Do not infer information beyond what is stated
-- **Maintain Context**: Respect episode boundaries and fragment groups
-- **User-Specific**: All profiles are user-specific and never shared
-
-## Profile ID Generation
-
-Generate profile IDs by:
-1. Converting entity name to lowercase
-2. Replacing spaces and special characters with hyphens
-3. Example: "Rena Ryuugu" → "rena-ryuugu"
-
-## Update Strategy
-
-When updating profiles:
-- **Merge, Don't Replace**: Add new information to existing data
-- **Avoid Duplicates**: Check for existing traits, facts, relationships before adding
-- **Preserve Evidence**: Keep all citations, even when updating
-- **Maintain History**: Don't remove old information unless correcting errors
-
-## Response Format
-
-When processing requests:
-
-1. **Acknowledge Request**: Confirm what information is being extracted or retrieved
-2. **Show Actions**: List profiles being created or updated
-3. **Provide Summary**: Summarize the extracted information
-4. **Cite Sources**: Reference conversation context and citations used
-
-## Quality Standards
-
-- Extract only factual, verifiable information
-- Maintain consistent entity naming across profiles
-- Ensure all facts have supporting evidence
-- Respect user-specific interpretations
-- Preserve profile version history through updates
-
-## User Isolation
-
-CRITICAL: Profiles are user-specific and NEVER shared:
-- Always use the correct userId for all operations
-- Never retrieve or update profiles for other users
-- Maintain strict user data isolation
-
-Always ensure profile operations are accurate, well-sourced, and maintain user-specific knowledge.`;
-  }
-
-  /**
-   * Create stack outputs for agent IDs and alias IDs
-   * Requirement 6.4: Export agent IDs and alias IDs as stack outputs
-   */
-  private createOutputs(): void {
-    // Orchestrator Agent outputs
-    new cdk.CfnOutput(this, 'OrchestratorAgentId', {
-      value: this.orchestratorAgent.attrAgentId,
-      description: 'Orchestrator Agent ID',
-      exportName: 'CICADAOrchestratorAgentId',
+    // Lambda invoke permissions for sub-agents
+    this.queryFunction.grantInvoke(this.theoryFunction);
+
+    // Grant Bedrock model invocation
+    this.theoryFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'],
+        resources: ['*'],
+      })
+    );
+    
+    // CloudWatch Logs permissions (explicit for clarity)
+    this.theoryFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          'logs:CreateLogGroup',
+          'logs:CreateLogStream',
+          'logs:PutLogEvents',
+        ],
+        resources: [`arn:aws:logs:${this.region}:${this.account}:log-group:/aws/lambda/${this.stackName}-TheoryAgent:*`],
+      })
+    );
+
+    // ========================================
+    // Profile Agent Lambda
+    // ========================================
+    this.profileFunction = new lambdaNodejs.NodejsFunction(this, 'ProfileAgentFunction', {
+      ...commonLambdaProps,
+      functionName: `${this.stackName}-ProfileAgent`,
+      description: 'Profile Agent - Profile management specialist',
+      handler: 'handler',
+      entry: path.join(__dirname, '../../packages/backend/src/handlers/agentcore/profile-handler.ts'),
+      environment: {
+        ...commonLambdaProps.environment,
+        USER_PROFILES_TABLE: dataStack.userProfilesTable.tableName,
+        FRAGMENT_GROUPS_TABLE: dataStack.fragmentGroupsTable.tableName,
+        EPISODE_CONFIG_TABLE: dataStack.episodeConfigTable.tableName,
+      },
     });
 
-    new cdk.CfnOutput(this, 'OrchestratorAgentAliasId', {
-      value: this.orchestratorAgentAlias.attrAgentAliasId,
-      description: 'Orchestrator Agent Alias ID',
-      exportName: 'CICADAOrchestratorAgentAliasId',
+    // Grant Profile Agent permissions
+    // DynamoDB access for profiles, fragment groups, and episode config
+    dataStack.userProfilesTable.grantReadWriteData(this.profileFunction);
+    dataStack.fragmentGroupsTable.grantReadWriteData(this.profileFunction);
+    dataStack.episodeConfigTable.grantReadData(this.profileFunction);
+
+    // Grant Bedrock model invocation
+    this.profileFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'],
+        resources: ['*'],
+      })
+    );
+    
+    // CloudWatch Logs permissions (explicit for clarity)
+    this.profileFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          'logs:CreateLogGroup',
+          'logs:CreateLogStream',
+          'logs:PutLogEvents',
+        ],
+        resources: [`arn:aws:logs:${this.region}:${this.account}:log-group:/aws/lambda/${this.stackName}-ProfileAgent:*`],
+      })
+    );
+
+    // ========================================
+    // Orchestrator Agent Lambda
+    // ========================================
+    this.orchestratorFunction = new lambdaNodejs.NodejsFunction(this, 'OrchestratorFunction', {
+      ...commonLambdaProps,
+      functionName: `${this.stackName}-Orchestrator`,
+      description: 'Orchestrator Agent - Central coordinator for multi-agent system',
+      handler: 'handler',
+      entry: path.join(__dirname, '../../packages/backend/src/handlers/agentcore/orchestrator-handler.ts'),
+      memorySize: 512, // Orchestrator needs less memory (no heavy processing)
+      environment: {
+        ...commonLambdaProps.environment,
+        QUERY_FUNCTION_ARN: this.queryFunction.functionArn,
+        THEORY_FUNCTION_ARN: this.theoryFunction.functionArn,
+        PROFILE_FUNCTION_ARN: this.profileFunction.functionArn,
+        CONVERSATION_MEMORY_TABLE: dataStack.conversationMemoryTable.tableName,
+        // Orchestrator runs agents in-process, so needs their environment variables
+        KNOWLEDGE_BASE_BUCKET: dataStack.knowledgeBaseBucket.bucketName,
+        SCRIPT_DATA_BUCKET: dataStack.scriptDataBucket.bucketName,
+        USER_PROFILES_TABLE: dataStack.userProfilesTable.tableName,
+        FRAGMENT_GROUPS_TABLE: dataStack.fragmentGroupsTable.tableName,
+        EPISODE_CONFIG_TABLE: dataStack.episodeConfigTable.tableName,
+        MAX_EMBEDDINGS_TO_LOAD: '3000',
+      },
     });
 
-    // Query Agent outputs
-    new cdk.CfnOutput(this, 'QueryAgentId', {
-      value: this.queryAgent.attrAgentId,
-      description: 'Query Agent ID',
-      exportName: 'CICADAQueryAgentId',
+    // Grant Orchestrator permissions
+    // Lambda invoke permissions for all specialized agents
+    this.queryFunction.grantInvoke(this.orchestratorFunction);
+    this.theoryFunction.grantInvoke(this.orchestratorFunction);
+    this.profileFunction.grantInvoke(this.orchestratorFunction);
+    
+    // DynamoDB access for conversation memory (context passing)
+    dataStack.conversationMemoryTable.grantReadData(this.orchestratorFunction);
+    
+    // Orchestrator runs agents in-process, so needs access to all their resources
+    // S3 access for knowledge base and script data (for Query Agent)
+    dataStack.knowledgeBaseBucket.grantRead(this.orchestratorFunction);
+    dataStack.scriptDataBucket.grantRead(this.orchestratorFunction);
+    
+    // DynamoDB access for profiles, fragments, and episode config (for all agents)
+    dataStack.userProfilesTable.grantReadWriteData(this.orchestratorFunction);
+    dataStack.fragmentGroupsTable.grantReadWriteData(this.orchestratorFunction);
+    dataStack.episodeConfigTable.grantReadData(this.orchestratorFunction);
+
+    // Grant Bedrock model invocation (for classification if needed)
+    this.orchestratorFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'],
+        resources: ['*'],
+      })
+    );
+    
+    // CloudWatch Logs permissions (explicit for clarity)
+    this.orchestratorFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          'logs:CreateLogGroup',
+          'logs:CreateLogStream',
+          'logs:PutLogEvents',
+        ],
+        resources: [`arn:aws:logs:${this.region}:${this.account}:log-group:/aws/lambda/${this.stackName}-Orchestrator:*`],
+      })
+    );
+
+    // ========================================
+    // Gateway Lambda
+    // ========================================
+    this.gatewayFunction = new lambdaNodejs.NodejsFunction(this, 'GatewayFunction', {
+      ...commonLambdaProps,
+      functionName: `${this.stackName}-Gateway`,
+      description: 'Gateway - Entry point for all AgentCore requests',
+      handler: 'handler',
+      entry: path.join(__dirname, '../../packages/backend/src/handlers/agentcore/gateway-handler.ts'),
+      memorySize: 512, // Gateway needs less memory (routing only)
+      environment: {
+        ...commonLambdaProps.environment,
+        ORCHESTRATOR_FUNCTION_ARN: this.orchestratorFunction.functionArn,
+        QUERY_FUNCTION_ARN: this.queryFunction.functionArn,
+        THEORY_FUNCTION_ARN: this.theoryFunction.functionArn,
+        PROFILE_FUNCTION_ARN: this.profileFunction.functionArn,
+        USER_PROFILES_TABLE: dataStack.userProfilesTable.tableName,
+        CONVERSATION_MEMORY_TABLE: dataStack.conversationMemoryTable.tableName,
+        FRAGMENT_GROUPS_TABLE: dataStack.fragmentGroupsTable.tableName,
+        EPISODE_CONFIG_TABLE: dataStack.episodeConfigTable.tableName,
+        KNOWLEDGE_BASE_BUCKET: dataStack.knowledgeBaseBucket.bucketName,
+        // Add Cognito configuration for authentication
+        USER_POOL_ID: props.authStack?.userPool?.userPoolId || '',
+        USER_POOL_CLIENT_ID: props.authStack?.userPoolClient?.userPoolClientId || '',
+      },
     });
 
-    new cdk.CfnOutput(this, 'QueryAgentAliasId', {
-      value: this.queryAgentAlias.attrAgentAliasId,
-      description: 'Query Agent Alias ID',
-      exportName: 'CICADAQueryAgentAliasId',
+    // Grant Gateway permissions
+    // Lambda invoke permissions for all agents
+    this.orchestratorFunction.grantInvoke(this.gatewayFunction);
+    this.queryFunction.grantInvoke(this.gatewayFunction);
+    this.theoryFunction.grantInvoke(this.gatewayFunction);
+    this.profileFunction.grantInvoke(this.gatewayFunction);
+    
+    // DynamoDB access for profiles, memory, and config
+    dataStack.userProfilesTable.grantReadWriteData(this.gatewayFunction);
+    dataStack.conversationMemoryTable.grantReadWriteData(this.gatewayFunction);
+    dataStack.fragmentGroupsTable.grantReadData(this.gatewayFunction);
+    dataStack.episodeConfigTable.grantReadData(this.gatewayFunction);
+    
+    // S3 access for knowledge base (potential direct access)
+    dataStack.knowledgeBaseBucket.grantRead(this.gatewayFunction);
+    
+    // Grant Bedrock model invocation (for potential direct inference)
+    this.gatewayFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'],
+        resources: ['*'],
+      })
+    );
+    
+    // CloudWatch Logs permissions (explicit for clarity)
+    this.gatewayFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          'logs:CreateLogGroup',
+          'logs:CreateLogStream',
+          'logs:PutLogEvents',
+        ],
+        resources: [`arn:aws:logs:${this.region}:${this.account}:log-group:/aws/lambda/${this.stackName}-Gateway:*`],
+      })
+    );
+
+    // ========================================
+    // CloudWatch Logs - Retention Policy
+    // ========================================
+    // Set log retention to 7 days for cost optimization
+    const logRetention = cdk.aws_logs.RetentionDays.ONE_WEEK;
+
+    new cdk.aws_logs.LogGroup(this, 'GatewayLogGroup', {
+      logGroupName: `/aws/lambda/${this.gatewayFunction.functionName}`,
+      retention: logRetention,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
-    // Theory Agent outputs
-    new cdk.CfnOutput(this, 'TheoryAgentId', {
-      value: this.theoryAgent.attrAgentId,
-      description: 'Theory Agent ID',
-      exportName: 'CICADATheoryAgentId',
+    new cdk.aws_logs.LogGroup(this, 'OrchestratorLogGroup', {
+      logGroupName: `/aws/lambda/${this.orchestratorFunction.functionName}`,
+      retention: logRetention,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
-    new cdk.CfnOutput(this, 'TheoryAgentAliasId', {
-      value: this.theoryAgentAlias.attrAgentAliasId,
-      description: 'Theory Agent Alias ID',
-      exportName: 'CICADATheoryAgentAliasId',
+    new cdk.aws_logs.LogGroup(this, 'QueryLogGroup', {
+      logGroupName: `/aws/lambda/${this.queryFunction.functionName}`,
+      retention: logRetention,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
-    // Profile Agent outputs
-    new cdk.CfnOutput(this, 'ProfileAgentId', {
-      value: this.profileAgent.attrAgentId,
-      description: 'Profile Agent ID',
-      exportName: 'CICADAProfileAgentId',
+    new cdk.aws_logs.LogGroup(this, 'TheoryLogGroup', {
+      logGroupName: `/aws/lambda/${this.theoryFunction.functionName}`,
+      retention: logRetention,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
-    new cdk.CfnOutput(this, 'ProfileAgentAliasId', {
-      value: this.profileAgentAlias.attrAgentAliasId,
-      description: 'Profile Agent Alias ID',
-      exportName: 'CICADAProfileAgentAliasId',
+    new cdk.aws_logs.LogGroup(this, 'ProfileLogGroup', {
+      logGroupName: `/aws/lambda/${this.profileFunction.functionName}`,
+      retention: logRetention,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
-    // Agent ARNs for reference
-    new cdk.CfnOutput(this, 'OrchestratorAgentArn', {
-      value: this.orchestratorAgent.attrAgentArn,
-      description: 'Orchestrator Agent ARN',
+    // ========================================
+    // Stack Outputs
+    // ========================================
+    new cdk.CfnOutput(this, 'GatewayFunctionArn', {
+      value: this.gatewayFunction.functionArn,
+      description: 'ARN of Gateway Lambda function',
+      exportName: `${this.stackName}-GatewayFunctionArn`,
     });
 
-    new cdk.CfnOutput(this, 'QueryAgentArn', {
-      value: this.queryAgent.attrAgentArn,
-      description: 'Query Agent ARN',
+    new cdk.CfnOutput(this, 'OrchestratorFunctionArn', {
+      value: this.orchestratorFunction.functionArn,
+      description: 'ARN of Orchestrator Lambda function',
+      exportName: `${this.stackName}-OrchestratorFunctionArn`,
     });
 
-    new cdk.CfnOutput(this, 'TheoryAgentArn', {
-      value: this.theoryAgent.attrAgentArn,
-      description: 'Theory Agent ARN',
+    new cdk.CfnOutput(this, 'QueryFunctionArn', {
+      value: this.queryFunction.functionArn,
+      description: 'ARN of Query Agent Lambda function',
+      exportName: `${this.stackName}-QueryFunctionArn`,
     });
 
-    new cdk.CfnOutput(this, 'ProfileAgentArn', {
-      value: this.profileAgent.attrAgentArn,
-      description: 'Profile Agent ARN',
+    new cdk.CfnOutput(this, 'TheoryFunctionArn', {
+      value: this.theoryFunction.functionArn,
+      description: 'ARN of Theory Agent Lambda function',
+      exportName: `${this.stackName}-TheoryFunctionArn`,
     });
 
-    // Lambda function outputs
-    new cdk.CfnOutput(this, 'QueryAgentToolsFunctionArn', {
-      value: this.queryAgentToolsFunction.functionArn,
-      description: 'Query Agent Tools Lambda Function ARN',
+    new cdk.CfnOutput(this, 'ProfileFunctionArn', {
+      value: this.profileFunction.functionArn,
+      description: 'ARN of Profile Agent Lambda function',
+      exportName: `${this.stackName}-ProfileFunctionArn`,
     });
 
-    new cdk.CfnOutput(this, 'OrchestratorAgentToolsFunctionArn', {
-      value: this.orchestratorAgentToolsFunction.functionArn,
-      description: 'Orchestrator Agent Tools Lambda Function ARN',
-    });
-
-    new cdk.CfnOutput(this, 'TheoryAgentToolsFunctionArn', {
-      value: this.theoryAgentToolsFunction.functionArn,
-      description: 'Theory Agent Tools Lambda Function ARN',
-    });
-
-    new cdk.CfnOutput(this, 'ProfileAgentToolsFunctionArn', {
-      value: this.profileAgentToolsFunction.functionArn,
-      description: 'Profile Agent Tools Lambda Function ARN',
+    new cdk.CfnOutput(this, 'AgentStackStatus', {
+      value: 'AgentCore Lambda functions deployed successfully',
+      description: 'Status of AgentStack migration to AgentCore',
     });
   }
 }

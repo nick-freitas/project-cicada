@@ -15,3 +15,7 @@ export * from './base';
 
 // Types
 export * from './types';
+
+// Specialized Agents
+export * from './query';
+export * from './orchestrator';

@@ -33,11 +33,26 @@ export class DataStack extends cdk.Stack {
     });
 
     // Conversation Memory Table
+    // Supports AgentCore Memory service for conversation history
+    // Requirements: 11.1, 11.2, 11.3, 11.4, 11.5
     this.conversationMemoryTable = new dynamodb.Table(this, 'ConversationMemory', {
       partitionKey: { name: 'userId', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'sessionKey', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
+      // TTL for automatic cleanup of old sessions (Requirement 11.5)
+      // Sessions older than 90 days will be automatically deleted
+      timeToLiveAttribute: 'ttl',
+    });
+
+    // Add GSI for efficient session retrieval by lastAccessed time
+    // Allows querying recent sessions across all users for monitoring
+    // Requirement 11.5: Efficient session retrieval
+    this.conversationMemoryTable.addGlobalSecondaryIndex({
+      indexName: 'lastAccessed-index',
+      partitionKey: { name: 'userId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'lastAccessed', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.KEYS_ONLY,
     });
 
     // Fragment Groups Table

@@ -124,6 +124,7 @@ export abstract class CICADAAgentBase extends Agent {
   constructor(config: CICADAAgentConfig) {
     // Initialize Strands Agent with Bedrock model
     super({
+      model: config.modelId || 'us.amazon.nova-lite-v1:0',
       systemPrompt: config.systemPrompt,
       maxTokens: config.maxTokens || 2048,
       temperature: config.temperature || 0.7,

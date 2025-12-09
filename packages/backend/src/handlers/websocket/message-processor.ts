@@ -1,35 +1,31 @@
 import { SQSHandler, SQSEvent } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import {
-  BedrockRuntimeClient,
-  ConverseStreamCommand,
-} from '@aws-sdk/client-bedrock-runtime';
-import {
-  BedrockAgentRuntimeClient,
-  InvokeAgentCommand,
-} from '@aws-sdk/client-bedrock-agent-runtime';
+import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 import { RequestTrackingService } from '../../services/request-tracking-service';
 import { sendToConnection } from './handler';
 import { WebSocketResponse } from '@cicada/shared-types';
 import { logger } from '../../utils/logger';
-import { semanticSearch } from '../../services/knowledge-base-service';
 
 const dynamoClient = new DynamoDBClient({});
-const bedrockClient = new BedrockRuntimeClient({});
-const agentRuntimeClient = new BedrockAgentRuntimeClient({});
+const lambdaClient = new LambdaClient({});
 const requestTrackingService = new RequestTrackingService(dynamoClient);
 
 const DOMAIN_NAME = process.env.WEBSOCKET_DOMAIN_NAME || '';
 const STAGE = process.env.WEBSOCKET_STAGE || 'prod';
-const MODEL_ID = 'amazon.nova-pro-v1:0';
-const PROFILE_AGENT_ID = process.env.PROFILE_AGENT_ID || '';
-const PROFILE_AGENT_ALIAS_ID = process.env.PROFILE_AGENT_ALIAS_ID || '';
-const THEORY_AGENT_ID = process.env.THEORY_AGENT_ID || '';
-const THEORY_AGENT_ALIAS_ID = process.env.THEORY_AGENT_ALIAS_ID || '';
+const GATEWAY_FUNCTION_ARN = process.env.GATEWAY_FUNCTION_ARN || '';
 
 /**
- * Process messages from SQS queue and invoke Orchestrator Agent via AgentCore
- * Requirements: 7.1, 7.4, 8.1
+ * Process messages from SQS queue and invoke Gateway Lambda
+ * 
+ * This handler replaces the custom RAG logic with Gateway invocation.
+ * The Gateway handles:
+ * - Identity extraction and validation
+ * - Policy enforcement
+ * - Memory management
+ * - Agent orchestration
+ * - Streaming responses
+ * 
+ * Requirements: 8.1, 8.2, 12.1, 12.2, 16.1
  */
 export const handler: SQSHandler = async (event: SQSEvent): Promise<void> => {
   for (const record of event.Records) {
@@ -52,131 +48,119 @@ export const handler: SQSHandler = async (event: SQSEvent): Promise<void> => {
       const validRequestId: string = requestId;
       const validConnectionId: string = connectionId;
 
-      logger.info('Processing message with custom RAG', {
+      logger.info('Processing message via Gateway', {
         requestId,
         userId,
         sessionId,
         queryLength: userMessage.length,
       });
 
-      // Step 1: Perform semantic search over script data
-      logger.info('Performing semantic search', { requestId, query: userMessage.substring(0, 50) });
-      
-      const searchResults = await semanticSearch(userMessage, {
-        topK: 20,
-        minScore: 0.5,
-        maxEmbeddingsToLoad: 3000,
-      });
+      // Validate Gateway function ARN is configured
+      if (!GATEWAY_FUNCTION_ARN) {
+        throw new Error('GATEWAY_FUNCTION_ARN environment variable not set');
+      }
 
-      logger.info('Search completed', {
+      // Invoke Gateway Lambda with streaming callback
+      // Requirement 8.1: Pass userId, sessionId, connectionId to Gateway
+      // Requirement 8.2: Handle streaming responses from Gateway
+      const gatewayRequest = {
+        query: userMessage,
+        userId,
+        sessionId,
+        connectionId: validConnectionId,
+        requestId: validRequestId,
+      };
+
+      logger.info('Invoking Gateway Lambda', {
         requestId,
-        resultCount: searchResults.length,
-        topScore: searchResults[0]?.score,
+        functionArn: GATEWAY_FUNCTION_ARN,
       });
 
-      // Step 2: Format search results as context
-      let contextText = '';
-      if (searchResults.length > 0) {
-        contextText = 'Here are relevant passages from the Higurashi script:\n\n';
-        searchResults.slice(0, 10).forEach((result, idx) => {
-          contextText += `[${idx + 1}] Episode: ${result.episodeName}, Chapter: ${result.chapterId}, Message: ${result.messageId}\n`;
-          if (result.speaker) {
-            contextText += `Speaker: ${result.speaker}\n`;
-          }
-          contextText += `Text: ${result.textENG}\n`;
-          contextText += `Relevance: ${(result.score * 100).toFixed(1)}%\n\n`;
-        });
-      } else {
-        contextText = 'No relevant passages found in the script for this query.\n\n';
-      }
-
-      // Step 3: Build prompt with context
-      const systemPrompt = `You are CICADA, an AI assistant for analyzing "Higurashi no Naku Koro Ni". 
-
-You have access to the complete script database through semantic search. When answering questions:
-1. Base your response STRICTLY on the provided script passages
-2. Cite specific episodes, chapters, and speakers
-3. If no relevant passages are found, say so honestly
-4. Never make up information not present in the passages
-5. Maintain episode boundaries - don't mix information from different story arcs
-
-Be conversational but accurate. Always ground your responses in the script evidence provided.`;
-
-      const userPrompt = `${contextText}User question: ${userMessage}
-
-Based on the script passages above, please answer the user's question. Cite specific episodes and chapters in your response.`;
-
-      // Step 4: Call Bedrock model with streaming
-      logger.info('Invoking Bedrock model', { requestId, model: MODEL_ID });
-
-      const command = new ConverseStreamCommand({
-        modelId: MODEL_ID,
-        messages: [
-          {
-            role: 'user',
-            content: [{ text: userPrompt }],
-          },
-        ],
-        system: [{ text: systemPrompt }],
-        inferenceConfig: {
-          maxTokens: 2048,
-          temperature: 0.7,
-          topP: 0.9,
-        },
-      });
-
-      const response = await bedrockClient.send(command);
-
-      if (!response.stream) {
-        throw new Error('No stream received from Bedrock');
-      }
-
-      // Step 5: Process streaming response
-      let fullResponse = '';
-      
-      for await (const event of response.stream) {
-        if (event.contentBlockDelta?.delta?.text) {
-          const chunkText = event.contentBlockDelta.delta.text;
-          fullResponse += chunkText;
-
-          // Store chunk for reconnection support
-          await requestTrackingService.addResponseChunk(validRequestId, chunkText);
-
-          // Send chunk to WebSocket connection
-          const chunkResponse: WebSocketResponse = {
+      // Invoke Gateway Lambda
+      const invokeCommand = new InvokeCommand({
+        FunctionName: GATEWAY_FUNCTION_ARN,
+        InvocationType: 'RequestResponse', // Synchronous invocation
+        Payload: JSON.stringify({
+          body: JSON.stringify(gatewayRequest),
+          requestContext: {
             requestId: validRequestId,
-            type: 'chunk',
-            content: chunkText,
-          };
+          },
+        }),
+      });
 
-          await sendToConnection(DOMAIN_NAME, STAGE, validConnectionId, chunkResponse);
-        }
+      const lambdaResponse = await lambdaClient.send(invokeCommand);
 
-        if (event.messageStop) {
-          logger.info('Stream completed', {
-            requestId,
-            responseLength: fullResponse.length,
-          });
-        }
+      // Parse Lambda response
+      if (!lambdaResponse.Payload) {
+        throw new Error('No payload received from Gateway Lambda');
+      }
+
+      const payloadString = new TextDecoder().decode(lambdaResponse.Payload);
+      const gatewayResponse = JSON.parse(payloadString);
+
+      logger.info('Gateway Lambda response received', {
+        requestId,
+        statusCode: gatewayResponse.statusCode,
+      });
+
+      // Check for Lambda execution errors
+      if (lambdaResponse.FunctionError) {
+        throw new Error(`Gateway Lambda error: ${lambdaResponse.FunctionError}`);
+      }
+
+      // Parse response body
+      const responseBody = JSON.parse(gatewayResponse.body || '{}');
+
+      // Handle Gateway errors
+      if (gatewayResponse.statusCode !== 200 || !responseBody.content) {
+        const errorMessage = responseBody.error || 'Gateway returned an error';
+        throw new Error(errorMessage);
+      }
+
+      // Stream the response to WebSocket
+      // Requirement 12.2: Maintain backward compatibility with WebSocketResponse format
+      const fullResponse = responseBody.content;
+
+      // Simulate streaming by chunking the response
+      // This maintains the same streaming behavior as before
+      const chunkSize = 50; // Characters per chunk
+      for (let i = 0; i < fullResponse.length; i += chunkSize) {
+        const chunk = fullResponse.substring(i, i + chunkSize);
+
+        // Store chunk for reconnection support
+        await requestTrackingService.addResponseChunk(validRequestId, chunk);
+
+        // Send chunk to WebSocket connection
+        const chunkResponse: WebSocketResponse = {
+          requestId: validRequestId,
+          type: 'chunk',
+          content: chunk,
+        };
+
+        await sendToConnection(DOMAIN_NAME, STAGE, validConnectionId, chunkResponse);
+
+        // Small delay to simulate streaming
+        await new Promise(resolve => setTimeout(resolve, 10));
       }
 
       // Send completion marker
       // Requirement 8.1: Send completion marker when stream completes
       const completeResponse: WebSocketResponse = {
-        requestId,
+        requestId: validRequestId,
         type: 'complete',
       };
 
-      await sendToConnection(DOMAIN_NAME, STAGE, connectionId, completeResponse);
+      await sendToConnection(DOMAIN_NAME, STAGE, validConnectionId, completeResponse);
 
       // Mark request as complete
-      await requestTrackingService.completeRequest(requestId, fullResponse);
+      await requestTrackingService.completeRequest(validRequestId, fullResponse);
 
       const duration = Date.now() - startTime;
       logger.info('Message processing complete', {
         requestId,
         duration,
         responseLength: fullResponse.length,
+        metadata: responseBody.metadata,
       });
     } catch (error) {
       const duration = Date.now() - startTime;

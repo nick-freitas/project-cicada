@@ -52,7 +52,7 @@ This plan migrates from Bedrock Agents (managed service) to AgentCore framework 
   - Add data isolation enforcement (strict mode)
   - _Requirements: 10.1, 10.2, 10.3, 10.4_
 
-- [-] 4. Implement AgentCore Memory service
+- [x] 4. Implement AgentCore Memory service
   - Create MemoryService class for conversation history
   - Implement getSession() method
   - Implement addMessage() method
@@ -60,7 +60,7 @@ This plan migrates from Bedrock Agents (managed service) to AgentCore framework 
   - Integrate with existing ConversationMemory DynamoDB table
   - _Requirements: 11.1, 11.2, 11.3, 11.4_
 
-- [ ] 5. Implement AgentCore Gateway
+- [x] 5. Implement AgentCore Gateway
   - Create Gateway class as entry point
   - Implement handleRequest() method
   - Integrate Identity, Policy, and Memory services
@@ -70,7 +70,7 @@ This plan migrates from Bedrock Agents (managed service) to AgentCore framework 
 
 ### Phase 2: Implement AgentCore Agents
 
-- [ ] 6. Implement Query Agent with AgentCore
+- [x] 6. Implement Query Agent with AgentCore
   - Create QueryAgent class extending AgentCore Agent
   - Register SemanticSearchTool
   - Implement deterministic search invocation (ALWAYS invoke)
@@ -99,7 +99,7 @@ This plan migrates from Bedrock Agents (managed service) to AgentCore framework 
   - Generate queries that return zero results
   - Verify response explicitly states no information was found
 
-- [ ] 7. Implement Orchestrator Agent with AgentCore
+- [x] 7. Implement Orchestrator Agent with AgentCore
   - Create OrchestratorAgent class extending AgentCore Agent
   - Register Query, Theory, Profile as sub-agents (not tools)
   - Implement explicit classification logic (keyword-based)
@@ -121,7 +121,7 @@ This plan migrates from Bedrock Agents (managed service) to AgentCore framework 
   - Generate random queries
   - Verify each routing decision produces a log entry
 
-- [ ] 8. Implement Theory Agent with AgentCore
+- [x] 8. Implement Theory Agent with AgentCore
   - Create TheoryAgent class extending AgentCore Agent
   - Register Query Agent as sub-agent
   - Implement explicit Query Agent invocation for evidence gathering
@@ -136,7 +136,7 @@ This plan migrates from Bedrock Agents (managed service) to AgentCore framework 
   - Generate random theory analysis requests
   - Verify Query Agent is invoked for each request
 
-- [ ] 9. Implement Profile Agent with AgentCore
+- [x] 9. Implement Profile Agent with AgentCore
   - Create ProfileAgent class extending AgentCore Agent
   - Register Profile Service tools
   - Implement explicit operation classification (GET, UPDATE, LIST)
@@ -153,14 +153,14 @@ This plan migrates from Bedrock Agents (managed service) to AgentCore framework 
 
 ### Phase 3: Implement Tools and Services
 
-- [ ] 10. Implement Semantic Search Tool for AgentCore
+- [x] 10. Implement Semantic Search Tool for AgentCore
   - Create SemanticSearchTool class extending AgentCore Tool
   - Define input schema (query, topK, minScore, episodeIds)
   - Implement execute() method calling existing semanticSearch service
   - Add error handling and logging
   - _Requirements: 6.1, 6.2_
 
-- [ ] 11. Implement Profile Service Tools for AgentCore
+- [x] 11. Implement Profile Service Tools for AgentCore
   - Create GetProfileTool class
   - Create UpdateProfileTool class
   - Create ListProfilesTool class
@@ -168,7 +168,7 @@ This plan migrates from Bedrock Agents (managed service) to AgentCore framework 
   - Implement execute() methods calling existing profile service
   - _Requirements: 6.1, 6.2_
 
-- [ ] 12. Implement sub-agent invocation utilities
+- [x] 12. Implement sub-agent invocation utilities
   - Create invokeSubAgent() helper method
   - Implement identity and memory context passing
   - Add execution trace logging
@@ -184,14 +184,14 @@ This plan migrates from Bedrock Agents (managed service) to AgentCore framework 
 
 ### Phase 4: Update Infrastructure
 
-- [ ] 13. Remove Bedrock Agents from CDK
+- [x] 13. Remove Bedrock Agents from CDK
   - Remove all CfnAgent constructs from AgentStack
   - Remove CfnAgentAlias constructs
   - Remove agent execution role (will use Lambda roles instead)
   - Clean up agent-related outputs
   - _Requirements: 16.1, 16.2_
 
-- [ ] 14. Add AgentCore Lambda functions to CDK
+- [x] 14. Add AgentCore Lambda functions to CDK
   - Create Gateway Lambda function
   - Create Orchestrator Lambda function
   - Create Query Agent Lambda function
@@ -200,7 +200,7 @@ This plan migrates from Bedrock Agents (managed service) to AgentCore framework 
   - Configure memory, timeout, and environment variables
   - _Requirements: 1.3, 1.4_
 
-- [ ] 15. Configure IAM permissions for AgentCore Lambdas
+- [x] 15. Configure IAM permissions for AgentCore Lambdas
   - Grant DynamoDB access (profiles, memory, config)
   - Grant S3 access (knowledge base, script data)
   - Grant Bedrock model invocation permissions
@@ -208,14 +208,14 @@ This plan migrates from Bedrock Agents (managed service) to AgentCore framework 
   - Grant CloudWatch Logs permissions
   - _Requirements: 6.2, 6.3_
 
-- [ ] 16. Update Message Processor to invoke Gateway
+- [x] 16. Update Message Processor to invoke Gateway
   - Replace current custom RAG logic with Gateway invocation
   - Pass userId, sessionId, connectionId to Gateway
   - Handle streaming responses from Gateway
   - Maintain backward compatibility with WebSocketResponse format
   - _Requirements: 8.1, 8.2, 12.1, 12.2_
 
-- [ ] 17. Add DynamoDB table for AgentCore Memory (if needed)
+- [x] 17. Add DynamoDB table for AgentCore Memory (if needed)
   - Check if existing ConversationMemory table is sufficient
   - Add indexes for efficient session retrieval
   - Configure TTL for old sessions
@@ -307,14 +307,14 @@ This plan migrates from Bedrock Agents (managed service) to AgentCore framework 
   - Generate agent invocations
   - Verify memory context is available
 
-- [ ] 30. Run integration tests for end-to-end flows
+- [x] 30. Run integration tests for end-to-end flows
   - Test: User query → Gateway → Orchestrator → Query Agent → Response
   - Test: Theory analysis → Theory Agent → Query Agent → Profile update
   - Test: Profile extraction → Profile Agent → DynamoDB
   - Test: Multi-turn conversation with memory
   - _Requirements: 15.1, 15.2, 15.3, 15.4_
 
-- [ ] 31. Perform manual testing with real queries
+- [x] 31. Perform manual testing with real queries
   - Test character queries (e.g., "Tell me about Rena")
   - Test episode queries (e.g., "What happens in Onikakushi?")
   - Test theory analysis (e.g., "Analyze: Rena knows about loops")
@@ -324,7 +324,7 @@ This plan migrates from Bedrock Agents (managed service) to AgentCore framework 
 
 ### Phase 6: Deployment and Monitoring
 
-- [ ] 32. Deploy AgentCore infrastructure
+- [x] 32. Deploy AgentCore infrastructure
   - Deploy updated CDK stacks (DataStack, AgentStack, APIStack)
   - Verify all Lambda functions are created
   - Verify IAM permissions are correct
